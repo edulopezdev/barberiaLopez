@@ -8,15 +8,15 @@ namespace Backend.Models
         public int Id { get; set; }
 
         [Required]
-        public DateTime FechaHora { get; set; } 
+        public DateTime FechaHora { get; set; }
 
         [Required]
-        public int ClienteId { get; set; } 
+        public int ClienteId { get; set; }
 
         [Required]
-        public int BarberoId { get; set; } 
+        public int BarberoId { get; set; }
 
         [Required]
-        public int EstadoId { get; set; } 
+        public int EstadoId { get; set; }
     }
 }

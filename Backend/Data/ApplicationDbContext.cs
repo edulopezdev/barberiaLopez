@@ -1,15 +1,16 @@
-using Microsoft.EntityFrameworkCore;
 using Backend.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Data
 {
     public class ApplicationDbContext : DbContext
     {
-        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) {}
+        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+            : base(options) { }
 
         // Mapeo de entidades con los nombres correctos según la base de datos
-        public DbSet<Usuario> Usuario { get; set; } 
-        public DbSet<Turno> Turno { get; set; } 
+        public DbSet<Usuario> Usuario { get; set; }
+        public DbSet<Turno> Turno { get; set; }
         public DbSet<ProductoServicio> ProductosServicios { get; set; }
         public DbSet<Atencion> Atencion { get; set; }
         public DbSet<DetalleAtencion> DetalleAtencion { get; set; }

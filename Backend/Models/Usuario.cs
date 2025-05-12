@@ -15,15 +15,15 @@ namespace Backend.Models
         [EmailAddress]
         public string? Email { get; set; }
 
-        public string? Telefono { get; set; } 
+        public string? Telefono { get; set; }
 
-        public string? Avatar { get; set; } 
+        public string? Avatar { get; set; }
 
         [Required]
-        public int RolId { get; set; } 
+        public int RolId { get; set; }
 
-        public bool AccedeAlSistema { get; set; } = false; 
+        public bool AccedeAlSistema { get; set; } = false;
 
-        public bool Activo { get; set; } = true; 
+        public bool Activo { get; set; } = true;
     }
 }
