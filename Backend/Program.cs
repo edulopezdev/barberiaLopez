@@ -1,4 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Reflection;
 using System.Security.Claims;
 using System.Text;
 using Backend.Data;
@@ -12,82 +13,89 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+// Servicios
+
+// Agregar controladores y explorador de API
+builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+
+// Configurar Swagger
 builder.Services.AddSwaggerGen(options =>
 {
     options.AddSecurityDefinition(
         "Bearer",
-        new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+        new OpenApiSecurityScheme
         {
             Name = "Authorization",
-            Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
+            Type = SecuritySchemeType.Http,
             Scheme = "Bearer",
             BearerFormat = "JWT",
-            In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+            In = ParameterLocation.Header,
             Description =
                 "Introduce tu token JWT aquí. Ejemplo: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'",
         }
     );
 
     options.AddSecurityRequirement(
-        new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+        new OpenApiSecurityRequirement
         {
             {
-                new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+                new OpenApiSecurityScheme
                 {
-                    Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                    Reference = new OpenApiReference
                     {
-                        Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                        Type = ReferenceType.SecurityScheme,
                         Id = "Bearer",
                     },
                 },
-                new string[] { }
+                Array.Empty<string>()
             },
         }
     );
-});
-builder.Services.AddControllers();
 
-// Configurar Entity Framework Core con MySQL/MariaDB
+    // Para evitar conflictos entre rutas duplicadas
+    options.ResolveConflictingActions(apiDescriptions => apiDescriptions.First());
+
+    // Incluir comentarios XML (opcional pero útil)
+    var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFilename);
+    options.IncludeXmlComments(xmlPath);
+});
+
+// Configurar base de datos
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySql(
         builder.Configuration.GetConnectionString("DefaultConnection"),
-        new MariaDbServerVersion(new Version(10, 4, 32)) // Ajustamos la versión de MariaDB
+        new MariaDbServerVersion(new Version(10, 4, 32))
     )
 );
 
-// CONFIGURAR AUTENTICACIÓN CON JWT
+// Configurar autenticación JWT
 builder
     .Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        // Recuperar la clave secreta desde el archivo de configuración
         var jwtKey =
             builder.Configuration["Jwt:Key"]
-            ?? throw new ArgumentNullException("Jwt:Key no está definido en appsettings.json");
+            ?? throw new ArgumentNullException("Jwt:Key no está definido");
 
         var key = Encoding.ASCII.GetBytes(jwtKey);
 
         options.TokenValidationParameters = new TokenValidationParameters
         {
-            // Valida el emisor del token
             ValidateIssuer = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"], // Debe coincidir con el valor de 'Issuer' en appsettings.json
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
 
-            // Valida el público del token
             ValidateAudience = true,
-            ValidAudience = builder.Configuration["Jwt:Audience"], // Debe coincidir con el valor de 'Audience' en appsettings.json
+            ValidAudience = builder.Configuration["Jwt:Audience"],
 
-            // Valida la firma y la expiración del token
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
 
-            // Clave de firma del JWT
             IssuerSigningKey = new SymmetricSecurityKey(key),
         };
     });
@@ -96,7 +104,8 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// Middleware
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -105,11 +114,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// Asegurar que la autenticación y autorización están activas
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Crea un conjunto de datos de ejemplo para realizar pruebas
+// Rutas de ejemplo
 var summaries = new[]
 {
     "Freezing",
@@ -143,6 +151,7 @@ app.MapGet(
     .WithOpenApi();
 
 app.MapControllers();
+
 app.Run();
 
 record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)

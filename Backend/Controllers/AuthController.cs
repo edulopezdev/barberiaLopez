@@ -91,9 +91,7 @@ namespace Backend.Controllers
             var tokenHandler = new JwtSecurityTokenHandler();
             var key = Encoding.ASCII.GetBytes(
                 _configuration["Jwt:Key"]
-                    ?? throw new ArgumentNullException(
-                        "Jwt:Key no está definido en appsettings.json"
-                    )
+                    ?? throw new ArgumentNullException("Jwt:Key no está definido")
             );
 
             var tokenDescriptor = new SecurityTokenDescriptor
@@ -107,6 +105,8 @@ namespace Backend.Controllers
                     }
                 ),
                 Expires = DateTime.UtcNow.AddHours(3),
+                Issuer = _configuration["Jwt:Issuer"],
+                Audience = _configuration["Jwt:Audience"],
                 SigningCredentials = new SigningCredentials(
                     new SymmetricSecurityKey(key),
                     SecurityAlgorithms.HmacSha256Signature
