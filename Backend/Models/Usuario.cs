@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Backend.Models
 {
@@ -25,5 +26,18 @@ namespace Backend.Models
         public bool AccedeAlSistema { get; set; } = false;
 
         public bool Activo { get; set; } = true;
+
+        public string? PasswordHash { get; set; } // Contraseña encriptada
+
+        [NotMapped]
+        public string? Password { get; set; } // Recibe la contraseña en texto plano, pero no se guarda en la DB
+
+        public DateTime FechaRegistro { get; set; } = DateTime.UtcNow;
+
+        public int IdUsuarioCrea { get; set; }
+
+        public int? IdUsuarioModifica { get; set; }
+
+        public DateTime? FechaModificacion { get; set; }
     }
 }

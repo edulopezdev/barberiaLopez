@@ -1,5 +1,10 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 using Backend.Data;
 using Backend.Models;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,6 +12,7 @@ namespace Backend.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize] // protección general de todos los endpoints
     public class UsuariosController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
@@ -74,40 +80,57 @@ namespace Backend.Controllers
         }
 
         // POST: api/usuarios (Crear un nuevo usuario)
+        [Authorize(Roles = "Administrador")]
         [HttpPost]
         public IActionResult PostUsuario([FromBody] Usuario usuario)
         {
+            var usuarioIdLogueado = 0; // ⚡ Temporalmente asignamos "0" hasta que haya autenticación
+
             if (!ModelState.IsValid)
             {
-                var errores = ModelState
-                    .Where(e => e.Value.Errors.Any())
-                    .ToDictionary(
-                        e => e.Key,
-                        e => e.Value.Errors.Select(err => err.ErrorMessage).ToArray()
-                    );
-
                 return BadRequest(
-                    new
-                    {
-                        status = 400,
-                        error = "Bad Request",
-                        message = "Error en la validación de los datos.",
-                        details = errores,
-                    }
+                    new { status = 400, message = "Error en la validación de los datos." }
                 );
+            }
+
+            usuario.IdUsuarioCrea = usuarioIdLogueado;
+            usuario.FechaRegistro = DateTime.UtcNow;
+
+            if (usuario.AccedeAlSistema)
+            {
+                if (string.IsNullOrEmpty(usuario.Password))
+                {
+                    return BadRequest(
+                        new { status = 400, message = "El usuario requiere una contraseña." }
+                    );
+                }
+                usuario.PasswordHash = BCrypt.Net.BCrypt.HashPassword(usuario.Password);
             }
 
             _context.Usuario.Add(usuario);
             _context.SaveChanges();
 
+            // ✅ Ahora devolvemos un JSON con los datos del usuario creado
             return CreatedAtAction(
                 nameof(GetUsuario),
                 new { id = usuario.Id },
                 new
                 {
                     status = 201,
-                    message = "Usuario creado correctamente.",
-                    usuario,
+                    message = "Usuario creado exitosamente.",
+                    usuario = new
+                    {
+                        usuario.Id,
+                        usuario.Nombre,
+                        usuario.Email,
+                        usuario.Telefono,
+                        usuario.Avatar,
+                        usuario.RolId,
+                        usuario.AccedeAlSistema,
+                        usuario.Activo,
+                        usuario.FechaRegistro,
+                        usuario.IdUsuarioCrea,
+                    },
                 }
             );
         }
@@ -116,51 +139,60 @@ namespace Backend.Controllers
         [HttpPut("{id}")]
         public IActionResult PutUsuario(int id, Usuario usuario)
         {
-            if (id != usuario.Id)
+            var usuarioIdLogueado = int.Parse(
+                User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0"
+            );
+            var esAdministrador = User.IsInRole("Administrador");
+
+            if (usuarioIdLogueado != id && !esAdministrador)
             {
-                return BadRequest(
+                return Unauthorized(
                     new
                     {
-                        status = 400,
-                        error = "Bad Request",
-                        message = "El ID en la URL no coincide con el ID del cuerpo de la solicitud.",
+                        status = 401,
+                        message = "No tienes permisos para modificar este usuario.",
                     }
                 );
             }
 
-            _context.Entry(usuario).State = EntityState.Modified;
+            var usuarioExistente = _context.Usuario.Find(id);
+            if (usuarioExistente == null)
+            {
+                return NotFound(new { status = 404, message = "El usuario no existe." });
+            }
 
-            try
+            usuarioExistente.Nombre = usuario.Nombre;
+            usuarioExistente.Email = usuario.Email;
+            usuarioExistente.Telefono = usuario.Telefono;
+            usuarioExistente.Avatar = usuario.Avatar;
+            usuarioExistente.RolId = usuario.RolId;
+            usuarioExistente.AccedeAlSistema = usuario.AccedeAlSistema;
+            usuarioExistente.Activo = usuario.Activo;
+            usuarioExistente.IdUsuarioModifica = usuarioIdLogueado; // Guardamos quién modificó
+            usuarioExistente.FechaModificacion = DateTime.UtcNow; //  Guardamos fecha de modificación
+
+            if (!string.IsNullOrEmpty(usuario.PasswordHash))
             {
-                _context.SaveChanges();
+                usuarioExistente.PasswordHash = BCrypt.Net.BCrypt.HashPassword(
+                    usuario.PasswordHash
+                );
             }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!_context.Usuario.Any(e => e.Id == id))
-                {
-                    return NotFound(
-                        new
-                        {
-                            status = 404,
-                            error = "Not Found",
-                            message = "El usuario no existe.",
-                        }
-                    );
-                }
-                throw;
-            }
+
+            _context.Entry(usuarioExistente).State = EntityState.Modified;
+            _context.SaveChanges();
 
             return Ok(
                 new
                 {
                     status = 200,
                     message = "Usuario actualizado correctamente.",
-                    usuario,
+                    usuario = usuarioExistente,
                 }
             );
         }
 
         // DELETE: api/usuarios/{id} (Eliminación lógica)
+        [Authorize(Roles = "Administrador")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteUsuario(int id)
         {

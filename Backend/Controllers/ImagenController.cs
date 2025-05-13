@@ -161,6 +161,10 @@ namespace Backend.Controllers
             }
 
             var imagen = await _context.Imagen.FindAsync(idImagen);
+            if (imagen == null)
+            {
+                return NotFound(new { status = 404, message = "Imagen no encontrada." });
+            }
             _context.Imagen.Remove(imagen);
             await _context.SaveChangesAsync();
 
