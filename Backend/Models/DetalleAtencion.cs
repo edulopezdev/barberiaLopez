@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Backend.Models
 {
@@ -8,17 +9,21 @@ namespace Backend.Models
         public int Id { get; set; }
 
         [Required]
-        public int AtencionId { get; set; } // Clave foránea (Atencion)
+        public int AtencionId { get; set; }
 
         [Required]
-        public int ProductoServicioId { get; set; } // Clave foránea (ProductoServicio)
+        public int ProductoServicioId { get; set; }
 
         [Required]
         [Range(1, int.MaxValue)]
-        public int Cantidad { get; set; } = 1; // Por defecto es 1
+        public int Cantidad { get; set; } = 1;
 
         [Required]
         [Range(0, 10000)]
-        public decimal PrecioUnitario { get; set; } // Precio por unidad
+        public decimal PrecioUnitario { get; set; }
+
+        // propiedades de navegación
+        [ForeignKey("ProductoServicioId")]
+        public ProductoServicio ProductoServicio { get; set; } = null!;
     }
 }

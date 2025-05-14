@@ -17,6 +17,7 @@ namespace Backend.Data
         public DbSet<EstadoTurno> EstadoTurno { get; set; }
         public DbSet<Imagen> Imagen { get; set; }
         public DbSet<Rol> Rol { get; set; }
+        public DbSet<Pago> Pagos { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -31,6 +32,18 @@ namespace Backend.Data
             modelBuilder.Entity<EstadoTurno>().ToTable("estado_turno");
             modelBuilder.Entity<Imagen>().ToTable("imagen");
             modelBuilder.Entity<Rol>().ToTable("rol");
+            modelBuilder.Entity<Pago>().ToTable("pago");
+
+            // Configuración de relaciones para `Pago`
+            modelBuilder
+                .Entity<Pago>()
+                .HasOne(p => p.Atencion)
+                .WithMany() // Una Atención puede tener múltiples pagos (pagos parciales)
+                .HasForeignKey(p => p.AtencionId)
+                .OnDelete(DeleteBehavior.Cascade); // Asegúrate de que esta política de eliminación es la que deseas
+
+            // Configuración del Enum `MetodoPago` para almacenarse como `string`
+            modelBuilder.Entity<Pago>().Property(p => p.MetodoPago).HasConversion<string>();
         }
     }
 }

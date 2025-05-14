@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Reflection;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json.Serialization;
 using Backend.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -20,7 +21,12 @@ var builder = WebApplication.CreateBuilder(args);
 // Servicios
 
 // Agregar controladores y explorador de API
-builder.Services.AddControllers();
+builder
+    .Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 builder.Services.AddEndpointsApiExplorer();
 
 // Configurar Swagger
