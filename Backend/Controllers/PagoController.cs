@@ -483,11 +483,6 @@ namespace Backend.Controllers
                     )
                     .Sum(d => d.Cantidad * d.PrecioUnitario);
 
-                // Cálculos adicionales para la conclusión final
-                var totalEnCortes = servicios; // Total en cortes (servicios no almacenables)
-                var totalEnVentas = productos; // Total en ventas (productos almacenables)
-                var recaudacionDelDia = totalEnCortes + totalEnVentas; // Suma total de recaudación
-
                 // Devolvemos los resultados, agregando la conclusión final
                 return Ok(
                     new
@@ -501,24 +496,10 @@ namespace Backend.Controllers
                         metodoPago = porMetodo,
                         conclusion = new
                         {
-                            totalEnCortes = totalEnCortes,
-                            totalEnVentas = totalEnVentas,
-                            recaudacionDelDia = recaudacionDelDia,
+                            totalEnCortes = servicios,
+                            totalEnVentas = productos,
+                            recaudacionDelDia = facturacionTotal, // Total real ingresado
                         },
-                    }
-                );
-
-                // Devolvemos los resultados
-                return Ok(
-                    new
-                    {
-                        status = 200,
-                        message = "Facturación del día obtenida correctamente.",
-                        fecha = fecha.ToString("yyyy-MM-dd"),
-                        facturacionTotal = facturacionTotal,
-                        servicios = new { total = servicios },
-                        productos = new { total = productos },
-                        metodoPago = porMetodo,
                     }
                 );
             }
