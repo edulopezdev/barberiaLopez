@@ -202,5 +202,188 @@ namespace Backend.Controllers
                 }
             );
         }
+
+        //-------Filtros-------//
+        [HttpGet("PorFecha")]
+        public IActionResult GetTurnosPorFecha(DateTime fecha, int page = 1, int pageSize = 10)
+        {
+            var query = _context.Turno.AsQueryable();
+
+            // Filtrar por fecha específica
+            query = query.Where(t => t.FechaHora.Date == fecha.Date);
+
+            var totalTurnos = query.Count();
+            var turnos = query
+                .OrderBy(t => t.FechaHora)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            return Ok(
+                new
+                {
+                    status = 200,
+                    message = totalTurnos > 0
+                        ? "Lista de turnos obtenida correctamente."
+                        : "No hay turnos en la fecha especificada.",
+                    pagination = new
+                    {
+                        totalPages = (int)Math.Ceiling((double)totalTurnos / pageSize),
+                        currentPage = page,
+                        pageSize,
+                        totalTurnos,
+                    },
+                    turnos = turnos ?? new List<Turno>(),
+                }
+            );
+        }
+
+        [HttpGet("PorRango")]
+        public IActionResult GetTurnosPorRango(
+            DateTime fechaInicio,
+            DateTime fechaFin,
+            int page = 1,
+            int pageSize = 10
+        )
+        {
+            var query = _context.Turno.AsQueryable();
+
+            // 🔹 Validar que `fechaInicio` no sea mayor que `fechaFin`
+            if (fechaInicio > fechaFin)
+            {
+                return BadRequest(
+                    new
+                    {
+                        status = 400,
+                        error = "Bad Request",
+                        message = "La fecha de inicio no puede ser mayor que la fecha de fin.",
+                    }
+                );
+            }
+
+            // 🔹 Filtrar turnos dentro del rango de fechas
+            query = query.Where(t =>
+                t.FechaHora.Date >= fechaInicio.Date && t.FechaHora.Date <= fechaFin.Date
+            );
+
+            var totalTurnos = query.Count();
+            var turnos = query
+                .OrderBy(t => t.FechaHora)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            return Ok(
+                new
+                {
+                    status = 200,
+                    message = totalTurnos > 0
+                        ? "Lista de turnos obtenida correctamente."
+                        : "No hay turnos dentro del rango de fechas especificado.",
+                    pagination = new
+                    {
+                        totalPages = (int)Math.Ceiling((double)totalTurnos / pageSize),
+                        currentPage = page,
+                        pageSize,
+                        totalTurnos,
+                    },
+                    turnos = turnos ?? new List<Turno>(),
+                }
+            );
+        }
+
+        [HttpGet("PorCliente")]
+        public IActionResult GetTurnoPorCliente(int clienteId, int page = 1, int pageSize = 10)
+        {
+            var query = _context.Turno.AsQueryable();
+
+            // Validar que `clienteId` sea válido
+            if (clienteId <= 0)
+            {
+                return BadRequest(
+                    new
+                    {
+                        status = 400,
+                        error = "Bad Request",
+                        message = "El clienteId debe ser mayor a 0.",
+                    }
+                );
+            }
+
+            // Filtrar por cliente asegurando que `ClienteId` existe
+            query = query.Where(t => t.ClienteId == clienteId);
+
+            var totalTurnos = query.Count();
+            var turno = query
+                .OrderBy(t => t.FechaHora)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            return Ok(
+                new
+                {
+                    status = 200,
+                    message = totalTurnos > 0
+                        ? "Lista de turno obtenida correctamente."
+                        : "No hay turno para el cliente especificado.",
+                    pagination = new
+                    {
+                        totalPages = (int)Math.Ceiling((double)totalTurnos / pageSize),
+                        currentPage = page,
+                        pageSize,
+                        totalTurnos,
+                    },
+                    turno = turno ?? new List<Turno>(),
+                }
+            );
+        }
+
+        [HttpGet("PorEstado")]
+        public IActionResult GetTurnoPorEstado(int estadoId, int page = 1, int pageSize = 10)
+        {
+            var query = _context.Turno.AsQueryable();
+
+            // Validar que `estadoId` sea válido
+            if (estadoId <= 0)
+            {
+                return BadRequest(
+                    new
+                    {
+                        status = 400,
+                        error = "Bad Request",
+                        message = "El estadoId debe ser mayor a 0.",
+                    }
+                );
+            }
+
+            // Filtrar por estado asegurando que `EstadoId` existe
+            query = query.Where(t => t.EstadoId == estadoId);
+
+            var totalTurnos = query.Count();
+            var turno = query
+                .OrderBy(t => t.FechaHora)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            return Ok(
+                new
+                {
+                    status = 200,
+                    message = totalTurnos > 0
+                        ? "Lista de turno obtenida correctamente."
+                        : "No hay turno con el estado especificado.",
+                    pagination = new
+                    {
+                        totalPages = (int)Math.Ceiling((double)totalTurnos / pageSize),
+                        currentPage = page,
+                        pageSize,
+                        totalTurnos,
+                    },
+                    turno = turno ?? new List<Turno>(),
+                }
+            );
+        }
     }
 }
