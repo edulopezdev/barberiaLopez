@@ -1,7 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using Backend.Models; // Asegúrate de que Atencion esté en el mismo namespace
+using backend.Models; // Asegúrate de que Atencion esté en el mismo namespace
 
 public enum MetodoPago
 {

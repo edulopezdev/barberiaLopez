@@ -1,8 +1,8 @@
 using System.ComponentModel.DataAnnotations;
-using Backend.Data;
-using Backend.Models;
+using backend.Data;
+using backend.Models;
 
-namespace Backend.Models
+namespace backend.Models
 {
     public class Atencion
     {
