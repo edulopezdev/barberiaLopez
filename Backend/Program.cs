@@ -20,6 +20,22 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Servicios
 
+// Configurar CORS antes de construir la aplicación
+var corsPolicy = "_myAllowSpecificOrigins";
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(
+        corsPolicy,
+        policy =>
+        {
+            policy
+                .WithOrigins("http://localhost:8080") // Permitir solicitudes desde Vue
+                .AllowAnyMethod()
+                .AllowAnyHeader();
+        }
+    );
+});
+
 // Agregar controladores y explorador de API
 builder
     .Services.AddControllers()
@@ -63,10 +79,8 @@ builder.Services.AddSwaggerGen(options =>
         }
     );
 
-    // Para evitar conflictos entre rutas duplicadas
     options.ResolveConflictingActions(apiDescriptions => apiDescriptions.First());
 
-    // Incluir comentarios XML (opcional pero útil)
     var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFilename);
     options.IncludeXmlComments(xmlPath);
@@ -95,13 +109,10 @@ builder
         {
             ValidateIssuer = true,
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
-
             ValidateAudience = true,
             ValidAudience = builder.Configuration["Jwt:Audience"],
-
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-
             IssuerSigningKey = new SymmetricSecurityKey(key),
         };
     });
@@ -121,6 +132,10 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseAuthentication();
+
+// Aplica la política de CORS después de autenticación pero antes de autorización
+app.UseCors(corsPolicy);
+
 app.UseAuthorization();
 
 // Rutas de ejemplo
@@ -157,7 +172,6 @@ app.MapGet(
     .WithOpenApi();
 
 app.MapControllers();
-
 app.Run();
 
 record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)

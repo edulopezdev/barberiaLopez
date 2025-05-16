@@ -3,19 +3,23 @@ import App from './App.vue';
 import router from './router/router.js';
 import { library } from '@fortawesome/fontawesome-svg-core';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
+
+// Importar iconos necesarios
 import {
   faHouse,
   faCalendar,
   faRightToBracket,
   faScissors,
   faUser,
-  faBox,
+  faBox
 } from '@fortawesome/free-solid-svg-icons';
 
+// Agrega los íconos a la librería FontAwesome
 library.add(faHouse, faCalendar, faRightToBracket, faScissors, faUser, faBox);
 
+// === INICIALIZACIÓN DE LA APP ===
 const app = createApp(App);
 
 app.use(router);
-app.component('font-awesome-icon', FontAwesomeIcon); 
+app.component('font-awesome-icon', FontAwesomeIcon);
 app.mount('#app');

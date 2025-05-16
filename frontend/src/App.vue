@@ -1,36 +1,24 @@
 <template>
-  <div class="app-container">
-    <SidebarMenu />
-    <div class="content">
-      <h1>Bienvenido a la Barbería</h1>
-      <router-view />
-    </div>
-  </div>
+  <router-view />
 </template>
 
 <script>
-import SidebarMenu from './components/SidebarMenu.vue';
-
 export default {
   name: 'App',
-  components: { SidebarMenu },
 };
 </script>
 
 <style>
-:root {
-  --sidebar-width: 240px;
+/* Estilos globales opcionales */
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', 'Helvetica Neue', sans-serif;
+  background-color: #121212; /* Fondo oscuro */
+  color: #f9fafb; /* Texto claro */
 }
 
-.app-container {
-  display: flex;
-}
-
-.content {
-  margin-left: var(--sidebar-width);
-  flex-grow: 1;
-  padding: 20px;
-  min-height: 100vh;
-  background-color: #f9fafb; /* color suave para contraste */
+* {
+  box-sizing: border-box;
 }
 </style>
