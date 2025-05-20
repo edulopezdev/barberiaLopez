@@ -52,6 +52,58 @@ namespace backend.Controllers
             );
         }
 
+        // GET: api/usuarios/usuarios-sistema
+        [HttpGet("usuarios-sistema")]
+        public IActionResult GetUsuariosSistema(int page = 1, int pageSize = 10)
+        {
+            var query = _context.Usuario.Where(u => u.Activo && (u.RolId == 1 || u.RolId == 2));
+
+            var total = query.Count();
+            var data = query.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+
+            return Ok(
+                new
+                {
+                    status = 200,
+                    message = "Usuarios obtenidos correctamente.",
+                    pagination = new
+                    {
+                        totalPages = (int)Math.Ceiling((double)total / pageSize),
+                        currentPage = page,
+                        pageSize,
+                        total,
+                    },
+                    usuarios = data,
+                }
+            );
+        }
+
+        // GET: api/usuarios/clientes
+        [HttpGet("clientes")]
+        public IActionResult GetClientes(int page = 1, int pageSize = 10)
+        {
+            var query = _context.Usuario.Where(u => u.Activo && u.RolId == 3);
+
+            var total = query.Count();
+            var data = query.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+
+            return Ok(
+                new
+                {
+                    status = 200,
+                    message = "Clientes obtenidos correctamente.",
+                    pagination = new
+                    {
+                        totalPages = (int)Math.Ceiling((double)total / pageSize),
+                        currentPage = page,
+                        pageSize,
+                        total,
+                    },
+                    clientes = data,
+                }
+            );
+        }
+
         // GET: api/usuarios/{id} (Un usuario específico)
         [HttpGet("{id}")]
         public async Task<IActionResult> GetUsuario(int id)

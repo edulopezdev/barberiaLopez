@@ -7,6 +7,8 @@
     "@fullcalendar/daygrid": "^6.1.17",
     "@fullcalendar/interaction": "^6.1.17",
     "@fullcalendar/timegrid": "^6.1.17",
-    "@fullcalendar/vue3": "^6.1.17"
+    "@fullcalendar/vue3": "^6.1.17",
+    "primeicons": "^7.0.0",
+    "primevue": "^3.44.0"
   }
 }

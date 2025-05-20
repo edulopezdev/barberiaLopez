@@ -1,25 +1,42 @@
-import { createApp } from 'vue';
-import App from './App.vue';
-import router from './router/router.js';
-import { library } from '@fortawesome/fontawesome-svg-core';
-import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
+import { createApp } from 'vue'
+import App from './App.vue'
+import router from './router'
+import axios from 'axios'
+import authService from './services/auth.service'
+import './style.css'
 
-// Importar iconos necesarios
-import {
-  faHouse,
-  faCalendar,
-  faRightToBracket,
-  faScissors,
-  faUser,
-  faBox
-} from '@fortawesome/free-solid-svg-icons';
+// Import PrimeVue
+import PrimeVue from 'primevue/config'
 
-// Agrega los íconos a la librería FontAwesome
-library.add(faHouse, faCalendar, faRightToBracket, faScissors, faUser, faBox);
+// Temas y estilos
+import 'primevue/resources/themes/saga-blue/theme.css'
+import 'primevue/resources/primevue.min.css'
+import 'primeicons/primeicons.css'
+import 'primeflex/primeflex.css'
 
-// === INICIALIZACIÓN DE LA APP ===
-const app = createApp(App);
+const apiClient = axios.create({
+  baseURL: 'http://localhost:5042/api'
+})
 
-app.use(router);
-app.component('font-awesome-icon', FontAwesomeIcon);
-app.mount('#app');
+// Interceptor para incluir el token en cada petición
+apiClient.interceptors.request.use(config => {
+  const token = authService.getToken()
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+}, error => {
+  return Promise.reject(error)
+})
+
+const app = createApp(App)
+
+// Inyectar apiClient globalmente en la app
+app.config.globalProperties.$api = apiClient
+
+// Usar router y PrimeVue
+app.use(router)
+app.use(PrimeVue)
+
+// Montar la aplicación
+app.mount('#app')
