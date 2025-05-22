@@ -6,18 +6,33 @@ import DashboardView from '../views/DashboardView.vue'
 import authService from '../services/auth.service'
 
 const routes = [
-  { path: '/', name: 'Home', component: HomeView },
-  { path: '/clientes', name: 'Clientes', component: ClientesView },
+  { path: '/', redirect: '/login' }, // 👈 Redirige la raíz al login
   {
     path: '/login',
     name: 'Login',
     component: LoginView
   },
   {
+    path: '/clientes',
+    name: 'Clientes',
+    component: ClientesView,
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/dashboard',
     name: 'Dashboard',
     component: DashboardView,
-    meta: { requiresAuth: true }  // Ruta protegida
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/home',
+    name: 'Home',
+    component: HomeView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/:catchAll(.*)', // Redirige cualquier ruta no existente al login
+    redirect: '/login'
   }
 ]
 

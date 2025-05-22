@@ -1,95 +1,100 @@
 <template>
   <div id="app">
-    <!-- Mostrar Sidebar solo si está autenticado -->
-    <AppSidebar v-if="isAuthenticated" class="sidebar-desktop" />
+    <AppTopbar class="topbar" v-if="isAuthenticated" />
 
-    <!-- Mostrar Topbar y pasar el Sidebar como slot si está autenticado -->
-    <AppTopbar v-if="isAuthenticated">
-      <template #mobile-sidebar>
-        <!-- Sidebar visible en móviles al hacer clic en el botón -->
-        <AppSidebar class="sidebar-mobile" />
-      </template>
-    </AppTopbar>
+    <div class="layout">
+      <!-- Sidebar fijo a la izquierda -->
+      <AppSidebar class="sidebar" v-if="isAuthenticated" />
 
-    <!-- Contenido principal -->
-    <div :class="['content', { full: !isAuthenticated }]">
-      <router-view />
+      <!-- Contenido principal a la derecha -->
+      <main class="main-content">
+        <router-view class="debug-border" />
+      </main>
     </div>
   </div>
 </template>
 
 <script>
-import AppSidebar from './components/AppSidebar.vue'
-import AppTopbar from './components/AppTopbar.vue'
-import authService from './services/auth.service'
+import AppSidebar from "./components/AppSidebar.vue";
+import AppTopbar from "./components/AppTopbar.vue";
+import authService from "./services/auth.service";
 
 export default {
   components: {
     AppSidebar,
-    AppTopbar
+    AppTopbar,
   },
   data() {
     return {
-      isAuthenticated: false
-    }
+      isAuthenticated: false,
+    };
   },
   watch: {
     $route: {
       immediate: true,
       handler() {
-        this.isAuthenticated = authService.isAuthenticated()
-      }
-    }
-  }
-}
+        this.isAuthenticated = authService.isAuthenticated();
+      },
+    },
+  },
+};
 </script>
 
 <style scoped>
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+}
+
 #app {
   display: flex;
-  flex-direction: column; /* En móviles, columnas para que topbar quede arriba */
-  min-height: 100vh;
+  flex-direction: column;
+  height: 100vh; /* Ocupa todo el alto de la pantalla */
+  width: 100vw;  /* Ocupa todo el ancho de la pantalla */
+  overflow: hidden;
 }
 
-.sidebar-desktop {
-  display: none;
+/* Topbar fijo arriba */
+.topbar {
+  height: 60px;
+  background-color: #27272a;
+  flex-shrink: 0;
 }
 
-.sidebar-mobile {
-  display: block;
+/* Layout horizontal: sidebar + contenido */
+.layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
 }
 
-/* Mostrar Sidebar solo en pantallas grandes */
-@media (min-width: 1024px) {
-  .sidebar-desktop {
-    display: block;
-  }
-  .sidebar-mobile {
-    display: none;
-  }
-
-  #app {
-    flex-direction: row;
-  }
-
-  .content {
-    margin-left: 250px;
-    padding: 2rem;
-    width: 100%;
-    transition: margin-left 0.3s ease;
-  }
-
-  .content.full {
-    margin-left: 0;
-    padding: 0;
-    width: 100%;
-  }
+/* Sidebar a la izquierda */
+.sidebar {
+  width: 250px;
+  background-color: #1f1f1f;
+  flex-shrink: 0;
 }
 
-@media (max-width: 1023px) {
-  .content {
-    margin-left: 0;
-    padding: 1rem;
-  }
+/* Contenido principal (a la derecha del sidebar) */
+.main-content {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
+  margin-left: 230px;  /* Respeta el espacio del sidebar */
+  margin-right: 2rem;
 }
+
+/* Borde rojo para visualizar el router-view */
+.debug-border {
+  border: 2px dashed red;
+  padding: 1rem;
+  margin-left: 0; /* Usa 0 para testear */
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+}
+
 </style>

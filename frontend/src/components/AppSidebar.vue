@@ -23,7 +23,7 @@ export default {
   data() {
     return {
       menuItems: [
-        { label: "Inicio", route: "/", icon: "pi pi-home" },
+        { label: "Inicio", route: "/dashboard", icon: "pi pi-home" },
         { label: "Clientes", route: "/clientes", icon: "pi pi-users" },
         { label: "Turnos", route: "/turnos", icon: "pi pi-calendar" },
         { label: "Productos", route: "/productos", icon: "pi pi-box" },

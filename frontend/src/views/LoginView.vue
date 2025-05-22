@@ -1,20 +1,35 @@
 <template>
   <div class="login-container">
     <Card>
-      <template #title>
-        Iniciar Sesión
-      </template>
+      <template #title> Iniciar Sesión </template>
       <template #content>
         <div class="p-fluid">
           <div class="p-field">
             <label for="email">Email</label>
-            <InputText id="email" v-model="usuario.email" type="email" placeholder="tu@correo.com" />
+            <InputText
+              id="email"
+              v-model="usuario.email"
+              type="email"
+              placeholder="tu@correo.com"
+            />
           </div>
           <div class="p-field">
             <label for="password">Contraseña</label>
-            <Password id="password" v-model="usuario.password" placeholder="*********" toggleMask :feedback="false" />
+            <Password
+              id="password"
+              v-model="usuario.password"
+              placeholder="*********"
+              toggleMask
+              :feedback="false"
+            />
           </div>
-          <Button label="Entrar" icon="pi pi-sign-in" @click="iniciarSesion" block severity="success" />
+          <Button
+            label="Entrar"
+            icon="pi pi-sign-in"
+            @click="iniciarSesion"
+            block
+            severity="success"
+          />
         </div>
       </template>
     </Card>
@@ -22,44 +37,43 @@
 </template>
 
 <script>
-import axios from 'axios'
+import axios from "axios";
 
 export default {
   data() {
     return {
       usuario: {
-        email: '',
-        password: ''
-      }
-    }
+        email: "",
+        password: "",
+      },
+    };
   },
   methods: {
     iniciarSesion() {
       if (!this.usuario.email || !this.usuario.password) {
-        alert('Por favor ingresa email y contraseña')
-        return
+        alert("Por favor ingresa email y contraseña");
+        return;
       }
 
-      const url = 'http://localhost:5042/api/auth/login'
+      const url = "http://localhost:5042/api/auth/login";
 
-      axios.post(url, this.usuario)
-        .then(res => {
-          localStorage.setItem('token', res.data.token)
-          localStorage.setItem('user', JSON.stringify(res.data.usuario))
+      axios
+        .post(url, this.usuario)
+        .then((res) => {
+          // Guardar el token y los datos del usuario en localStorage
+          localStorage.setItem("token", res.data.token);
+          localStorage.setItem("user", JSON.stringify(res.data.usuario));
 
-          if (res.data.usuario.rol === 'Administrador') {
-            this.$router.push('/dashboard')
-          } else {
-            this.$router.push('/')
-          }
+          // Redirigir a la ruta deseada (en este caso, /dashboard)
+          this.$router.push("/dashboard"); // Redirigir después del login
         })
-        .catch(err => {
-          console.error('Error al iniciar sesión:', err.response?.data || err)
-          alert('Usuario o contraseña incorrectos')
-        })
-    }
-  }
-}
+        .catch((err) => {
+          console.error("Error al iniciar sesión:", err.response?.data || err);
+          alert("Usuario o contraseña incorrectos");
+        });
+    },
+  },
+};
 </script>
 
 <style scoped>
@@ -74,7 +88,6 @@ export default {
   z-index: 1;
 }
 
-
 .card {
   border: none;
 }
@@ -88,15 +101,17 @@ export default {
   color: #333;
 }
 
-.p-inputtext, .p-password input {
+.p-inputtext,
+.p-password input {
   border-radius: 5px;
   padding: 0.8rem;
   background-color: #f5f5f5;
   border: 1px solid #ccc;
 }
 
-.p-inputtext:focus, .p-password input:focus {
-  border-color: #4CAF50;
+.p-inputtext:focus,
+.p-password input:focus {
+  border-color: #4caf50;
   box-shadow: 0 0 5px rgba(0, 128, 0, 0.4);
 }
 
@@ -110,8 +125,8 @@ export default {
 }
 
 .p-button-success {
-  background-color: #4CAF50;
-  border: 1px solid #4CAF50;
+  background-color: #4caf50;
+  border: 1px solid #4caf50;
 }
 
 .p-button-success:hover {
