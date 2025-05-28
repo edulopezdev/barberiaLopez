@@ -2,8 +2,7 @@
   <div class="app-topbar">
     <Toolbar class="toolbar">
       <template #start>
-        <div class="topbar-left">
-        </div>
+        <div class="topbar-left"></div>
       </template>
 
       <template #end>
@@ -17,20 +16,12 @@
           <span class="nombre-usuario">{{ usuarioLogueado.email }}</span>
           <Button
             icon="pi pi-sign-out"
-            severity="danger"
+            class="logout-btn"
             rounded
+            severity="danger"
             text
             @click="logout"
-            class="logout-btn"
             v-tooltip="'Cerrar sesión'"
-          />
-        </div>
-        <div v-else>
-          <Button
-            label="Iniciar sesión"
-            icon="pi pi-user"
-            @click="$router.push('/login')"
-            class="login-btn"
           />
         </div>
       </template>
@@ -42,7 +33,8 @@
 import Toolbar from "primevue/toolbar";
 import Button from "primevue/button";
 import authService from "../services/auth.service";
-import "primeicons/primeicons.css";
+import { confirmDialog } from "../utils/confirmDialog"; // Importamos la función reusable
+import Swal from "sweetalert2";
 
 export default {
   name: "AppTopbar",
@@ -59,10 +51,27 @@ export default {
     this.usuarioLogueado = authService.getUser();
   },
   methods: {
-    logout() {
-      authService.logout();
-      this.usuarioLogueado = null;
-      this.$router.push("/login");
+    async logout() {
+      const result = await confirmDialog({
+        title: "Cerrar sesión",
+        message: "¿Estás seguro de que querés salir?",
+      });
+
+      if (result.isConfirmed) {
+        authService.logout();
+        this.usuarioLogueado = null;
+        this.$router.push("/login");
+
+        Swal.fire({
+          title: "Sesión cerrada",
+          text: "Has salido correctamente.",
+          icon: "success",
+          timer: 2000,
+          showConfirmButton: false,
+          background: "#18181b",
+          color: "#fff",
+        });
+      }
     },
   },
 };
@@ -75,31 +84,25 @@ export default {
   left: 0;
   width: 100%;
   z-index: 1000;
+  background-color: #18181b;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  padding: 0.5rem 1rem;
 }
 
 .toolbar {
-  background-color: #18181b;
+  background-color: transparent;
+  padding: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 1rem;
 }
 
-/* Contenedor izquierdo con logo */
 .topbar-left {
   display: flex;
   align-items: center;
   gap: 1rem;
 }
 
-/* Nombre de la app */
-.app-name {
-  margin: 0;
-  font-weight: 600;
-  color: #ffffff;
-}
-
-/* Info usuario */
 .usuario-info {
   display: flex;
   align-items: center;
@@ -108,6 +111,7 @@ export default {
 
 .nombre-usuario {
   font-weight: 500;
+  color: #fff;
 }
 
 .avatar {
@@ -118,10 +122,20 @@ export default {
 }
 
 .logout-btn {
-  margin-left: 0.5rem;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #ffffff;
+  background-color: transparent;
+  border: none;
+  transition: background-color 0.3s ease;
 }
 
-.login-btn {
-  font-weight: 500;
+.logout-btn:hover {
+  background-color: #5d5d5d;
 }
 </style>

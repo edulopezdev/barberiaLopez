@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using backend.Data;
+using backend.Dtos;
 using backend.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -80,18 +81,75 @@ namespace backend.Controllers
 
         // GET: api/usuarios/clientes
         [HttpGet("clientes")]
-        public IActionResult GetClientes(int page = 1, int pageSize = 10)
+        public IActionResult GetClientes(
+            int page = 1,
+            int pageSize = 10,
+            string? nombre = null,
+            string? email = null,
+            string? telefono = null,
+            bool? activo = null
+        )
         {
-            var query = _context.Usuario.Where(u => u.Activo && u.RolId == 3);
+            // Base query: solo usuarios con RolId = 3 (clientes)
+            var query = _context.Usuario.AsQueryable();
+
+            query = query.Where(u => u.RolId == 3);
+
+            // Obtener ordenamiento desde query string manualmente
+            string? ordenarPor = HttpContext.Request.Query["ordenarPor"];
+            string? ordenarDesc = HttpContext.Request.Query["ordenDescendente"];
+            bool ordenarDescendente = ordenarDesc == "true";
+
+            if (!string.IsNullOrEmpty(ordenarPor))
+            {
+                query = ordenarDescendente
+                    ? query.OrderByDescending(e => EF.Property<object>(e, ordenarPor))
+                    : query.OrderBy(e => EF.Property<object>(e, ordenarPor));
+            }
+
+            // Filtros dinámicos
+            if (!string.IsNullOrEmpty(nombre))
+            {
+                query = query.Where(u => u.Nombre!.Contains(nombre));
+            }
+            if (!string.IsNullOrEmpty(email))
+            {
+                query = query.Where(u => u.Email!.Contains(email));
+            }
+            if (!string.IsNullOrEmpty(telefono))
+            {
+                query = query.Where(u => u.Telefono!.Contains(telefono));
+            }
+            if (activo.HasValue)
+            {
+                query = query.Where(u => u.Activo == activo.Value);
+            }
 
             var total = query.Count();
-            var data = query.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+
+            var data = query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(u => new ClienteDto
+                {
+                    Id = u.Id,
+                    Nombre = u.Nombre!,
+                    Email = u.Email!,
+                    Telefono = u.Telefono!,
+                    Activo = u.Activo,
+                })
+                .ToList();
+
+            string mensaje =
+                total > 0
+                    ? "Clientes obtenidos correctamente."
+                    : "No se encontraron clientes con esos filtros.";
 
             return Ok(
                 new
                 {
                     status = 200,
-                    message = "Clientes obtenidos correctamente.",
+                    message = mensaje,
                     pagination = new
                     {
                         totalPages = (int)Math.Ceiling((double)total / pageSize),
@@ -132,68 +190,136 @@ namespace backend.Controllers
         }
 
         // POST: api/usuarios (Crear un nuevo usuario)
-        [Authorize(Roles = "Administrador")]
         [HttpPost]
-        public IActionResult PostUsuario([FromBody] Usuario usuario)
+        public IActionResult PostUsuario([FromBody] CrearUsuarioDto dto)
         {
-            var usuarioIdLogueado = 0; // ⚡ Temporalmente asignamos "0" hasta que haya autenticación
+            try
+            {
+                var usuarioIdLogueado = int.Parse(
+                    User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0"
+                );
+                var esAdministrador = User.IsInRole("Administrador");
 
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(
+                        new
+                        {
+                            status = 400,
+                            message = "Datos inválidos.",
+                            errors = ModelState,
+                        }
+                    );
+                }
+
+                if (dto.RolId != 3 && !esAdministrador)
+                {
+                    return Unauthorized(
+                        new { status = 401, message = "No puedes crear usuarios con este rol" }
+                    );
+                }
+
+                var usuario = new Usuario
+                {
+                    Nombre = dto.Nombre,
+                    Email = dto.Email,
+                    Telefono = dto.Telefono,
+                    Avatar = dto.Avatar,
+                    RolId = dto.RolId,
+                    AccedeAlSistema = dto.AccedeAlSistema,
+                    Activo = true,
+                    FechaRegistro = DateTime.UtcNow,
+                    IdUsuarioCrea = usuarioIdLogueado,
+                };
+
+                if (usuario.RolId == 3)
+                {
+                    usuario.AccedeAlSistema = false; // por las dudas
+                }
+
+                if (usuario.AccedeAlSistema)
+                {
+                    if (string.IsNullOrEmpty(dto.Password))
+                    {
+                        return BadRequest(
+                            new
+                            {
+                                status = 400,
+                                message = "La contraseña es obligatoria si el usuario accede al sistema.",
+                            }
+                        );
+                    }
+
+                    usuario.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
+                }
+
+                if (!usuario.AccedeAlSistema)
+                {
+                    usuario.PasswordHash = BCrypt.Net.BCrypt.HashPassword("123");
+                }
+
+                _context.Usuario.Add(usuario);
+                _context.SaveChanges();
+
+                return CreatedAtAction(
+                    nameof(GetUsuario),
+                    new { id = usuario.Id },
+                    new
+                    {
+                        status = 201,
+                        message = "Usuario creado exitosamente.",
+                        usuario = new
+                        {
+                            usuario.Id,
+                            usuario.Nombre,
+                            usuario.Email,
+                            usuario.Telefono,
+                            usuario.Avatar,
+                            usuario.RolId,
+                            usuario.AccedeAlSistema,
+                            usuario.Activo,
+                            usuario.FechaRegistro,
+                            usuario.IdUsuarioCrea,
+                        },
+                    }
+                );
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(
+                    500,
+                    new { status = 500, message = "Error interno: " + ex.Message }
+                );
+            }
+        }
+
+        [HttpPut("{id}")]
+        public IActionResult PutUsuario(int id, [FromBody] EditarUsuarioDto dto)
+        {
             if (!ModelState.IsValid)
             {
                 return BadRequest(
-                    new { status = 400, message = "Error en la validación de los datos." }
+                    new
+                    {
+                        status = 400,
+                        message = "Datos inválidos",
+                        errors = ModelState,
+                    }
                 );
             }
 
-            usuario.IdUsuarioCrea = usuarioIdLogueado;
-            usuario.FechaRegistro = DateTime.UtcNow;
-
-            if (usuario.AccedeAlSistema)
+            // Intentar obtener el Id del usuario logueado (puede ser null)
+            var usuarioIdLogueadoString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            int usuarioIdLogueado = 0;
+            if (
+                !string.IsNullOrEmpty(usuarioIdLogueadoString)
+                && !int.TryParse(usuarioIdLogueadoString, out usuarioIdLogueado)
+            )
             {
-                if (string.IsNullOrEmpty(usuario.Password))
-                {
-                    return BadRequest(
-                        new { status = 400, message = "El usuario requiere una contraseña." }
-                    );
-                }
-                usuario.PasswordHash = BCrypt.Net.BCrypt.HashPassword(usuario.Password);
+                // Si falla el parseo, asignar 0 o manejar el error según convenga
+                usuarioIdLogueado = 0;
             }
 
-            _context.Usuario.Add(usuario);
-            _context.SaveChanges();
-
-            // ✅ Ahora devolvemos un JSON con los datos del usuario creado
-            return CreatedAtAction(
-                nameof(GetUsuario),
-                new { id = usuario.Id },
-                new
-                {
-                    status = 201,
-                    message = "Usuario creado exitosamente.",
-                    usuario = new
-                    {
-                        usuario.Id,
-                        usuario.Nombre,
-                        usuario.Email,
-                        usuario.Telefono,
-                        usuario.Avatar,
-                        usuario.RolId,
-                        usuario.AccedeAlSistema,
-                        usuario.Activo,
-                        usuario.FechaRegistro,
-                        usuario.IdUsuarioCrea,
-                    },
-                }
-            );
-        }
-
-        // PUT: api/usuarios/{id} (Actualizar usuario)
-        [HttpPut("{id}")]
-        public IActionResult PutUsuario(int id, Usuario usuario)
-        {
-            var usuarioIdLogueado = int.Parse(
-                User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0"
-            );
             var esAdministrador = User.IsInRole("Administrador");
 
             if (usuarioIdLogueado != id && !esAdministrador)
@@ -213,24 +339,39 @@ namespace backend.Controllers
                 return NotFound(new { status = 404, message = "El usuario no existe." });
             }
 
-            usuarioExistente.Nombre = usuario.Nombre;
-            usuarioExistente.Email = usuario.Email;
-            usuarioExistente.Telefono = usuario.Telefono;
-            usuarioExistente.Avatar = usuario.Avatar;
-            usuarioExistente.RolId = usuario.RolId;
-            usuarioExistente.AccedeAlSistema = usuario.AccedeAlSistema;
-            usuarioExistente.Activo = usuario.Activo;
-            usuarioExistente.IdUsuarioModifica = usuarioIdLogueado; // Guardamos quién modificó
-            usuarioExistente.FechaModificacion = DateTime.UtcNow; //  Guardamos fecha de modificación
+            var nuevoEmail = dto.Email?.Trim().ToLower();
+            var emailActual = usuarioExistente.Email?.Trim().ToLower();
 
-            if (!string.IsNullOrEmpty(usuario.PasswordHash))
+            if (nuevoEmail != emailActual)
             {
-                usuarioExistente.PasswordHash = BCrypt.Net.BCrypt.HashPassword(
-                    usuario.PasswordHash
+                bool emailDuplicado = _context.Usuario.Any(u =>
+                    u.Email != null && u.Email.ToLower() == nuevoEmail && u.Id != id
                 );
+
+                if (emailDuplicado)
+                {
+                    return BadRequest(
+                        new { status = 400, message = "El email ya está en uso por otro usuario." }
+                    );
+                }
             }
 
-            _context.Entry(usuarioExistente).State = EntityState.Modified;
+            // Modificar campos que querés actualizar
+            usuarioExistente.Nombre = dto.Nombre;
+            usuarioExistente.Email = dto.Email?.Trim() ?? usuarioExistente.Email;
+            usuarioExistente.Telefono = dto.Telefono;
+            usuarioExistente.Avatar = dto.Avatar;
+            usuarioExistente.RolId = dto.RolId;
+            usuarioExistente.AccedeAlSistema = dto.AccedeAlSistema;
+            usuarioExistente.Activo = dto.Activo;
+            usuarioExistente.IdUsuarioModifica = usuarioIdLogueado;
+            usuarioExistente.FechaModificacion = DateTime.UtcNow;
+
+            if (!string.IsNullOrWhiteSpace(dto.Password))
+            {
+                usuarioExistente.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
+            }
+
             _context.SaveChanges();
 
             return Ok(
@@ -238,13 +379,24 @@ namespace backend.Controllers
                 {
                     status = 200,
                     message = "Usuario actualizado correctamente.",
-                    usuario = usuarioExistente,
+                    usuario = new
+                    {
+                        usuarioExistente.Id,
+                        usuarioExistente.Nombre,
+                        usuarioExistente.Email,
+                        usuarioExistente.Telefono,
+                        usuarioExistente.Avatar,
+                        usuarioExistente.RolId,
+                        usuarioExistente.AccedeAlSistema,
+                        usuarioExistente.Activo,
+                        usuarioExistente.FechaRegistro,
+                        usuarioExistente.FechaModificacion,
+                    },
                 }
             );
         }
 
         // DELETE: api/usuarios/{id} (Eliminación lógica)
-        [Authorize(Roles = "Administrador")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteUsuario(int id)
         {

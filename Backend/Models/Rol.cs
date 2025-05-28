@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
 namespace backend.Models
@@ -9,6 +10,9 @@ namespace backend.Models
 
         [Required]
         [MaxLength(50)]
-        public string? NombreRol { get; set; } // Nombre del rol (Ej: "Admin", "Empleado", "Cliente")
+        public string NombreRol { get; set; } = null!; // no null permitido
+
+        // Navegación inversa (opcional)
+        public ICollection<Usuario> Usuarios { get; set; } = new List<Usuario>();
     }
 }

@@ -47,7 +47,6 @@ export default {
 </style>
 
 <style scoped>
-/* Sidebar principal */
 .sidebar {
   position: fixed;
   top: calc(var(--topbar-height) + var(--sidebar-margin));
@@ -55,24 +54,23 @@ export default {
   z-index: 100;
   width: 250px;
   height: calc(100vh - var(--topbar-height) - calc(var(--sidebar-margin) * 2));
-  background-color: #18181b;
-  border-radius: 1rem;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
-  padding: 1rem 1rem 1rem 1rem;
+  background-color: var(--surface-overlay);
+  border-radius: 0.5rem;
+  box-shadow: var(--shadow-2);
+  padding: 1rem;
   overflow-y: auto;
   transition: box-shadow 0.3s ease;
 }
 
-/* Título */
-.sidebar-title {
-  text-align: center;
-  font-weight: bold;
-  font-size: 1.2rem;
-  color: #ffffff;
-  margin-bottom: 1.25rem;
+.app-logo {
+  height: 60px;
+  object-fit: contain;
+  margin-bottom: 1.5rem;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
 }
 
-/* Menú */
 .menu-list {
   list-style: none;
   padding: 0;
@@ -83,41 +81,35 @@ export default {
   display: flex;
   align-items: center;
   padding: 0.75rem 1.5rem;
-  color: #ffffff;
+  color: var(--text-color);
   text-decoration: none;
   border-radius: 0.5rem;
-  transition: all 0.3s ease;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .menu-item:hover {
-  background-color: #383737;
-  color: #ffffff;
+  background-color: var(--surface-hover);
+  color: var(--text-color);
 }
 
 .menu-item.active {
-  color: #28a745;
+  color: var(--color-active-text);
+  font-weight: 600;
 }
 
 .menu-item.active .menu-icon {
-  color: #28a745;
+  color: var(--color-active-text);
 }
 
 .menu-icon {
   margin-right: 0.75rem;
   font-size: 1.2rem;
-  color: #ffffff;
+  color: var(--text-color);
   transition: color 0.3s ease;
 }
 
 .menu-label {
   font-size: 1rem;
   font-weight: 500;
-}
-
-.app-logo {
-  height: 60px;
-  object-fit: contain;
-  position: relative;
-  margin-bottom: 1.5rem;
 }
 </style>

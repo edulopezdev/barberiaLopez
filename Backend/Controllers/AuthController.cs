@@ -40,10 +40,9 @@ namespace backend.Controllers
                 );
             }
 
-            var usuario = await _context.Usuario.SingleOrDefaultAsync(u =>
-                u.Email == request.Email
-            );
-
+            var usuario = await _context
+                .Usuario.Include(u => u.Rol)
+                .SingleOrDefaultAsync(u => u.Email == request.Email);
             if (
                 usuario == null
                 || string.IsNullOrEmpty(usuario.PasswordHash)
@@ -74,6 +73,7 @@ namespace backend.Controllers
                         usuario.Nombre,
                         usuario.Email,
                         usuario.RolId,
+                        RolNombre = usuario.Rol?.NombreRol,
                     },
                 }
             );
@@ -94,16 +94,16 @@ namespace backend.Controllers
                     ?? throw new ArgumentNullException("Jwt:Key no está definido")
             );
 
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
+                new Claim(ClaimTypes.Email, usuario.Email ?? ""),
+                new Claim(ClaimTypes.Role, usuario.Rol?.NombreRol ?? "Usuario"),
+            };
+
             var tokenDescriptor = new SecurityTokenDescriptor
             {
-                Subject = new ClaimsIdentity(
-                    new[]
-                    {
-                        new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
-                        new Claim(ClaimTypes.Email, usuario.Email ?? ""),
-                        new Claim(ClaimTypes.Role, usuario.RolId.ToString()),
-                    }
-                ),
+                Subject = new ClaimsIdentity(claims),
                 Expires = DateTime.UtcNow.AddHours(3),
                 Issuer = _configuration["Jwt:Issuer"],
                 Audience = _configuration["Jwt:Audience"],

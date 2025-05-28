@@ -1,19 +1,3 @@
-<template>
-  <div id="app">
-    <AppTopbar class="topbar" v-if="isAuthenticated" />
-
-    <div class="layout">
-      <!-- Sidebar fijo a la izquierda -->
-      <AppSidebar class="sidebar" v-if="isAuthenticated" />
-
-      <!-- Contenido principal a la derecha -->
-      <main class="main-content">
-        <router-view class="debug-border" />
-      </main>
-    </div>
-  </div>
-</template>
-
 <script>
 import AppSidebar from "./components/AppSidebar.vue";
 import AppTopbar from "./components/AppTopbar.vue";
@@ -37,12 +21,33 @@ export default {
       },
     },
   },
+  mounted() {
+    this.isAuthenticated = authService.isAuthenticated();
+  },
 };
 </script>
 
-<style scoped>
+<template>
+  <Toast />
 
-html, body {
+  <div id="app">
+    <AppTopbar class="topbar" v-if="isAuthenticated" />
+
+    <div class="layout">
+      <!-- Sidebar fijo a la izquierda -->
+      <AppSidebar class="sidebar" v-if="isAuthenticated" />
+
+      <!-- Contenido principal a la derecha -->
+      <main class="main-content">
+        <router-view class="debug-border" />
+      </main>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+html,
+body {
   margin: 0;
   padding: 0;
   width: 100%;
@@ -53,7 +58,7 @@ html, body {
   display: flex;
   flex-direction: column;
   height: 100vh; /* Ocupa todo el alto de la pantalla */
-  width: 100vw;  /* Ocupa todo el ancho de la pantalla */
+  width: 100vw; /* Ocupa todo el ancho de la pantalla */
   overflow: hidden;
 }
 
@@ -83,18 +88,7 @@ html, body {
   flex-grow: 1;
   overflow-y: auto;
   padding: 1.5rem;
-  margin-left: 230px;  /* Respeta el espacio del sidebar */
+  margin-left: 230px; /* Respeta el espacio del sidebar */
   margin-right: 2rem;
 }
-
-/* Borde rojo para visualizar el router-view */
-.debug-border {
-  border: 2px dashed red;
-  padding: 1rem;
-  margin-left: 0; /* Usa 0 para testear */
-  width: 100%;
-  height: 100%;
-  box-sizing: border-box;
-}
-
 </style>

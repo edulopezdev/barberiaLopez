@@ -39,5 +39,8 @@ namespace backend.Models
         public int? IdUsuarioModifica { get; set; }
 
         public DateTime? FechaModificacion { get; set; }
+
+        [ForeignKey("RolId")]
+        public Rol Rol { get; set; } = null!;
     }
 }
