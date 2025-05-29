@@ -4,13 +4,13 @@
 
 <script>
 import ClienteForm from "@/components/ClienteForm.vue";
-import ClienteService from "@/services/ClienteService";
+import UsuarioService from "@/services/UsuarioService";
 
 export default {
   components: { ClienteForm },
   methods: {
     crear(clienteData) {
-      ClienteService.crearCliente(clienteData).then(() => {
+      UsuarioService.crearCliente(clienteData).then(() => {
         this.$router.push({ name: "Clientes" });
       });
     },

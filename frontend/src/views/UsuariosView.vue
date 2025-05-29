@@ -1,6 +1,5 @@
 <template>
   <div class="clientes-container">
-    <Toast />
     <Card>
       <template #title>
         <div class="encabezado-acciones">
@@ -230,119 +229,57 @@ export default {
   },
   methods: {
     // Modal: nuevo cliente
-    abrirModalNuevo(cliente = null) {
+    abrirModalNuevo() {
       console.log("Abrir modal para nuevo cliente");
-
-      // Si se pasa un cliente (como al reabrir tras error), se mantiene ese objeto
-      this.clienteSeleccionado = cliente
-        ? { ...cliente } // aca se copia el objeto
-        : {
-            nombre: "",
-            email: "",
-            telefono: "",
-          };
-
+      this.clienteSeleccionado = null;
       this.mostrarModal = true;
       document.body.classList.add("modal-open");
     },
+
     // Modal: editar cliente
     abrirModalEditar(cliente) {
       console.log("Abrir modal para editar cliente:", cliente);
       this.clienteSeleccionado = { ...cliente };
       this.mostrarModal = true;
     },
+
     cerrarModal() {
       this.mostrarModal = false;
       document.body.classList.remove("modal-open");
     },
 
-    async guardarCliente(clienteActualizado) {
+    // Guardar cliente: nuevo o editado
+    guardarCliente(clienteActualizado) {
+      const datos = {
+        nombre: clienteActualizado.nombre,
+        email: clienteActualizado.email,
+        telefono: clienteActualizado.telefono,
+        rolId: clienteActualizado.rolId,
+        accedeAlSistema: clienteActualizado.accedeAlSistema,
+      };
+
+      console.log("guardarCliente - datos recibidos:", datos);
+
       if (clienteActualizado.id) {
-        this.cerrarModal();
-
-        const result = await Swal.fire({
-          title: `¿Actualizar a ${clienteActualizado.nombre}?`,
-          icon: "question",
-          showCancelButton: true,
-          confirmButtonColor: "#3085d6",
-          cancelButtonColor: "#6c757d",
-          confirmButtonText: "Sí, actualizar",
-          cancelButtonText: "Cancelar",
-          background: "#18181b",
-          color: "#fff",
-        });
-
-        if (result.isConfirmed) {
-          try {
-            await UsuarioService.actualizarCliente(
-              clienteActualizado.id,
-              clienteActualizado
-            );
-            await Swal.fire({
-              title: "Actualizado",
-              text: `Cliente ${clienteActualizado.nombre} actualizado correctamente.`,
-              icon: "success",
-              timer: 2000,
-              timerProgressBar: true,
-              showConfirmButton: false,
-              background: "#18181b",
-              color: "#fff",
-            });
+        console.log("Editar cliente existente");
+        UsuarioService.actualizarCliente(clienteActualizado.id, datos)
+          .then(() => {
             this.obtenerClientes();
-          } catch (error) {
-            console.error("Error completo:", error);
-            console.error("Error response:", error.response);
-            const mensaje =
-              error?.response?.data?.message ||
-              "No se pudo actualizar el cliente.";
-
-            await Swal.fire({
-              title: "Error",
-              text: mensaje,
-              icon: "error",
-              background: "#18181b",
-              color: "#fff",
-            });
-
-            // Reabrir el modal y conservar los datos
-            this.abrirModalEditar({ ...clienteActualizado });
-          }
-        } else {
-          this.abrirModalEditar(clienteActualizado);
-        }
+            this.cerrarModal();
+          })
+          .catch((error) => {
+            console.error("Error al editar cliente:", error);
+          });
       } else {
-        this.cerrarModal();
-
-        try {
-          await UsuarioService.crearCliente(clienteActualizado);
-          await Swal.fire({
-            title: "Creado",
-            text: "Cliente creado correctamente.",
-            icon: "success",
-            timer: 2000,
-            timerProgressBar: true,
-            showConfirmButton: false,
-            background: "#18181b",
-            color: "#fff",
+        console.log("Crear nuevo cliente");
+        UsuarioService.crearCliente(datos)
+          .then(() => {
+            this.obtenerClientes();
+            this.cerrarModal();
+          })
+          .catch((error) => {
+            console.error("Error al crear cliente:", error);
           });
-          this.obtenerClientes();
-        } catch (error) {
-          console.error(error);
-
-          const mensaje =
-            error?.response?.data?.message || "No se pudo crear el cliente.";
-
-          await Swal.fire({
-            title: "Error",
-            text: mensaje,
-            icon: "error",
-            background: "#18181b",
-            color: "#fff",
-          });
-
-          // Reabrir el modal y conservar los datos
-          this.abrirModalNuevo({ ...clienteActualizado }); // <-- copia segura
-        }
       }
     },
     // Acciones de UI
@@ -377,18 +314,17 @@ export default {
         cancelButtonColor: "#6c757d",
         confirmButtonText: "Sí, eliminar",
         cancelButtonText: "Cancelar",
-        background: "#18181b",
-        color: "#fff",
+        background: "#18181b", // fondo oscuro
+        color: "#fff", // texto blanco
       }).then((result) => {
         if (result.isConfirmed) {
-          UsuarioService.eliminarUsuario(cliente.id)
+          UsuarioService.eliminarCliente(cliente.id)
             .then(() => {
               Swal.fire({
                 title: "Eliminado",
                 text: `El cliente ${cliente.nombre} ha sido eliminado.`,
                 icon: "success",
                 timer: 2000,
-                timerProgressBar: true,
                 showConfirmButton: false,
                 background: "#18181b",
                 color: "#fff",
@@ -401,13 +337,12 @@ export default {
                 title: "Error",
                 text: "No se pudo eliminar el cliente.",
                 icon: "error",
-                background: "#18181b",
-                color: "#fff",
               });
             });
         }
       });
     },
+
     confirmarEliminacion() {
       UsuarioService.eliminarCliente(this.clienteAEliminar.id)
         .then(() => {

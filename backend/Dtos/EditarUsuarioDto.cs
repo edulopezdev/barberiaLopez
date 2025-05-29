@@ -22,7 +22,7 @@ namespace backend.Dtos
 
         public bool AccedeAlSistema { get; set; }
 
-        public bool Activo { get; set; }
+        public bool? Activo { get; set; }
 
         public string? Password { get; set; }
     }

@@ -102,9 +102,24 @@ namespace backend.Controllers
 
             if (!string.IsNullOrEmpty(ordenarPor))
             {
-                query = ordenarDescendente
-                    ? query.OrderByDescending(e => EF.Property<object>(e, ordenarPor))
-                    : query.OrderBy(e => EF.Property<object>(e, ordenarPor));
+                ordenarPor = ordenarPor.ToLower(); // normalizar
+
+                query = ordenarPor switch
+                {
+                    "nombre" => ordenarDescendente
+                        ? query.OrderByDescending(u => u.Nombre)
+                        : query.OrderBy(u => u.Nombre),
+                    "email" => ordenarDescendente
+                        ? query.OrderByDescending(u => u.Email)
+                        : query.OrderBy(u => u.Email),
+                    "telefono" => ordenarDescendente
+                        ? query.OrderByDescending(u => u.Telefono)
+                        : query.OrderBy(u => u.Telefono),
+                    "activo" => ordenarDescendente
+                        ? query.OrderByDescending(u => u.Activo)
+                        : query.OrderBy(u => u.Activo),
+                    _ => query, // si el campo no es válido, no se ordena
+                };
             }
 
             // Filtros dinámicos
@@ -215,7 +230,20 @@ namespace backend.Controllers
                 if (dto.RolId != 3 && !esAdministrador)
                 {
                     return Unauthorized(
-                        new { status = 401, message = "No puedes crear usuarios con este rol" }
+                        new { status = 401, message = "No puedes crear usuarios con este rol." }
+                    );
+                }
+
+                // 🔐 Validación de email duplicado
+                var emailNormalizado = dto.Email?.Trim().ToLower();
+                bool emailExistente = _context.Usuario.Any(u =>
+                    u.Email != null && u.Email.ToLower() == emailNormalizado
+                );
+
+                if (emailExistente)
+                {
+                    return BadRequest(
+                        new { status = 400, message = "El email ya está en uso por otro usuario." }
                     );
                 }
 
@@ -293,6 +321,7 @@ namespace backend.Controllers
             }
         }
 
+        // PUT: api/usuarios/{id}
         [HttpPut("{id}")]
         public IActionResult PutUsuario(int id, [FromBody] EditarUsuarioDto dto)
         {
@@ -302,6 +331,7 @@ namespace backend.Controllers
                     new
                     {
                         status = 400,
+                        code = "DATOS_INVALIDOS",
                         message = "Datos inválidos",
                         errors = ModelState,
                     }
@@ -316,8 +346,7 @@ namespace backend.Controllers
                 && !int.TryParse(usuarioIdLogueadoString, out usuarioIdLogueado)
             )
             {
-                // Si falla el parseo, asignar 0 o manejar el error según convenga
-                usuarioIdLogueado = 0;
+                usuarioIdLogueado = 0; // Por defecto
             }
 
             var esAdministrador = User.IsInRole("Administrador");
@@ -328,6 +357,7 @@ namespace backend.Controllers
                     new
                     {
                         status = 401,
+                        code = "SIN_AUTORIZACION",
                         message = "No tienes permisos para modificar este usuario.",
                     }
                 );
@@ -336,7 +366,14 @@ namespace backend.Controllers
             var usuarioExistente = _context.Usuario.Find(id);
             if (usuarioExistente == null)
             {
-                return NotFound(new { status = 404, message = "El usuario no existe." });
+                return NotFound(
+                    new
+                    {
+                        status = 404,
+                        code = "USUARIO_NO_ENCONTRADO",
+                        message = "El usuario no existe.",
+                    }
+                );
             }
 
             var nuevoEmail = dto.Email?.Trim().ToLower();
@@ -351,19 +388,24 @@ namespace backend.Controllers
                 if (emailDuplicado)
                 {
                     return BadRequest(
-                        new { status = 400, message = "El email ya está en uso por otro usuario." }
+                        new
+                        {
+                            status = 400,
+                            code = "EMAIL_DUPLICADO",
+                            message = "El email ya está en uso por otro usuario.",
+                        }
                     );
                 }
             }
 
-            // Modificar campos que querés actualizar
+            // Actualizar campos
             usuarioExistente.Nombre = dto.Nombre;
             usuarioExistente.Email = dto.Email?.Trim() ?? usuarioExistente.Email;
             usuarioExistente.Telefono = dto.Telefono;
             usuarioExistente.Avatar = dto.Avatar;
             usuarioExistente.RolId = dto.RolId;
             usuarioExistente.AccedeAlSistema = dto.AccedeAlSistema;
-            usuarioExistente.Activo = dto.Activo;
+            usuarioExistente.Activo = dto.Activo ?? usuarioExistente.Activo;
             usuarioExistente.IdUsuarioModifica = usuarioIdLogueado;
             usuarioExistente.FechaModificacion = DateTime.UtcNow;
 
@@ -411,6 +453,45 @@ namespace backend.Controllers
             await _context.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        // PATCH: api/usuarios/{id}/estado
+        [HttpPatch("{id}/estado")]
+        public async Task<IActionResult> CambiarEstadoUsuario(
+            int id,
+            [FromBody] CambiarEstadoDto dto
+        )
+        {
+            var usuario = await _context.Usuario.FindAsync(id);
+            if (usuario == null)
+            {
+                return NotFound(new { status = 404, message = "El usuario no existe." });
+            }
+
+            usuario.Activo = dto.Activo;
+            usuario.FechaModificacion = DateTime.UtcNow;
+            usuario.IdUsuarioModifica = int.Parse(
+                User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0"
+            );
+
+            await _context.SaveChangesAsync();
+
+            return Ok(
+                new
+                {
+                    status = 200,
+                    message = dto.Activo
+                        ? "Usuario restaurado correctamente."
+                        : "Usuario desactivado correctamente.",
+                    usuario = new
+                    {
+                        usuario.Id,
+                        usuario.Nombre,
+                        usuario.Email,
+                        usuario.Activo,
+                    },
+                }
+            );
         }
     }
 }

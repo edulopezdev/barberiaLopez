@@ -7,7 +7,7 @@
 
 <script>
 import ClienteForm from "@/components/ClienteForm.vue";
-import ClienteService from "@/services/ClienteService";
+import UsuarioService from "@/services/UsuarioService";
 
 export default {
   components: { ClienteForm },
@@ -37,7 +37,7 @@ export default {
   methods: {
     cargarCliente(id) {
       this.cliente = null; // para mostrar "Cargando..."
-      ClienteService.getCliente(id)
+      UsuarioService.getCliente(id)
         .then(res => {
           this.cliente = res.data;
         })
@@ -46,7 +46,7 @@ export default {
         });
     },
     editar(clienteData) {
-      ClienteService.actualizarCliente(this.$route.params.id, clienteData)
+      UsuarioService.actualizarCliente(this.$route.params.id, clienteData)
         .then(() => {
           this.$router.push({ name: "Clientes" });
         })
