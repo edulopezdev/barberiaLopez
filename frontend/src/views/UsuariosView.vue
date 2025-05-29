@@ -1,9 +1,10 @@
 <template>
-  <div class="clientes-container">
+  <div class="usuarios-container">
+    <Toast />
     <Card>
       <template #title>
         <div class="encabezado-acciones">
-          <h4>Listado de Clientes</h4>
+          <h4>Usuarios del Sistema</h4>
           <div class="botones-acciones">
             <Button
               label="Filtros"
@@ -12,10 +13,10 @@
               @click="mostrarFiltros = !mostrarFiltros"
             />
             <Button
-              label="Nuevo Cliente"
+              label="Nuevo Usuario"
               icon="pi pi-plus"
-              class="boton-nuevo-cliente"
-              @click="crearCliente"
+              class="boton-nuevo-usuario"
+              @click="crearUsuario"
             />
           </div>
         </div>
@@ -24,14 +25,14 @@
       <template #content>
         <DataTable
           v-model:filters="filters"
-          :value="clientes"
+          :value="usuarios"
           :filterDisplay="mostrarFiltros ? 'row' : 'none'"
-          :globalFilterFields="['nombre', 'email', 'telefono']"
+          :globalFilterFields="['nombre', 'email', 'telefono', 'rolNombre']"
           lazy
           paginator
           :rows="pageSize"
           :first="first"
-          :totalRecords="totalClients"
+          :totalRecords="totalUsuarios"
           tableStyle="min-width: 100%"
           :loading="loading"
           @page="onPageChange"
@@ -68,6 +69,23 @@
                 @input="filterCallback()"
                 placeholder="Buscar por teléfono"
               />
+            </template>
+          </Column>
+
+          <Column field="rolNombre" header="Rol" sortable>
+            <template #filter="{ filterModel, filterCallback }">
+              <Dropdown
+                v-model="filterModel.value"
+                @change="filterCallback()"
+                :options="rolesDropdown"
+                optionLabel="label"
+                optionValue="value"
+                placeholder="Seleccionar rol"
+                showClear
+              />
+            </template>
+            <template #body="slotProps">
+              {{ slotProps.data.rolNombre }}
             </template>
           </Column>
 
@@ -109,8 +127,8 @@
                   severity="warning"
                   text
                   rounded
-                  v-tooltip.bottom="'Editar cliente'"
-                  @click="editarCliente(slotProps.data)"
+                  v-tooltip.bottom="'Editar usuario'"
+                  @click="editarUsuario(slotProps.data)"
                 />
                 <Button
                   :icon="
@@ -119,16 +137,15 @@
                   :severity="slotProps.data.activo ? 'danger' : 'success'"
                   text
                   rounded
-                  :label="slotProps.data.activo ? '' : ''"
                   :v-tooltip.bottom="
                     slotProps.data.activo
-                      ? 'Eliminar cliente'
-                      : 'Reactivar cliente'
+                      ? 'Eliminar usuario'
+                      : 'Reactivar usuario'
                   "
                   @click="
                     slotProps.data.activo
-                      ? eliminarCliente(slotProps.data)
-                      : reactivarCliente(slotProps.data)
+                      ? eliminarUsuario(slotProps.data)
+                      : reactivarUsuario(slotProps.data)
                   "
                 />
               </div>
@@ -138,33 +155,33 @@
       </template>
     </Card>
 
-    <!-- Modal Crear / Editar Cliente -->
+    <!-- Modal Crear / Editar Usuario -->
     <Dialog
       v-model:visible="mostrarModal"
-      :header="clienteSeleccionado?.id ? 'Editar Cliente' : 'Nuevo Cliente'"
+      :header="usuarioSeleccionado?.id ? 'Editar Usuario' : 'Nuevo Usuario'"
       :modal="true"
       :closeOnEscape="false"
       :closeOnBackdropClick="false"
       :closable="false"
       style="width: 450px"
     >
-      <ClienteForm
-        :cliente="clienteSeleccionado"
-        @guardar="guardarCliente($event)"
-        @cerrar="cerrarModal"
+      <UsuarioForm
+        :usuario="usuarioSeleccionado"
+        @guardar="guardarUsuario"
+        @cancelar="cerrarModal"
       />
     </Dialog>
 
-    <!-- Modal Detalle Cliente -->
+    <!-- Modal Detalle Usuario -->
     <Dialog
       v-model:visible="mostrarDetalleModal"
-      header="Detalle del Cliente"
+      header="Detalle del Usuario"
       :modal="true"
       :closable="false"
       style="width: 450px"
     >
-      <ClienteDetalle
-        :cliente="clienteSeleccionado"
+      <UsuarioDetalle
+        :usuario="usuarioSeleccionado"
         @cerrar="mostrarDetalleModal = false"
       />
     </Dialog>
@@ -182,8 +199,8 @@ import InputText from "primevue/inputtext";
 import Dropdown from "primevue/dropdown";
 import { FilterMatchMode } from "primevue/api";
 import Dialog from "primevue/dialog";
-import ClienteForm from "../components/ClienteForm.vue";
-import ClienteDetalle from "../components/ClienteDetalle.vue";
+import UsuarioForm from "../components/UsuarioForm.vue";
+import UsuarioDetalle from "../components/UsuarioDetalle.vue";
 import Swal from "sweetalert2";
 
 export default {
@@ -196,14 +213,14 @@ export default {
     InputText,
     Dropdown,
     Dialog,
-    ClienteForm,
-    ClienteDetalle,
+    UsuarioForm,
+    UsuarioDetalle,
   },
   data() {
     return {
       mostrarFiltros: false,
-      clientes: [],
-      totalClients: 0,
+      usuarios: [],
+      totalUsuarios: 0,
       currentPage: 1,
       pageSize: 10,
       first: 0,
@@ -214,99 +231,55 @@ export default {
         nombre: { value: null, matchMode: FilterMatchMode.STARTS_WITH },
         email: { value: null, matchMode: FilterMatchMode.CONTAINS },
         telefono: { value: null, matchMode: FilterMatchMode.CONTAINS },
+        rolNombre: { value: null, matchMode: FilterMatchMode.EQUALS },
         activo: { value: true, matchMode: FilterMatchMode.EQUALS },
       },
 
+      rolesDropdown: [
+        { label: "Administrador", value: "Administrador" },
+        { label: "Barbero", value: "Barbero" },
+      ],
+
       mostrarModal: false,
-      clienteSeleccionado: null,
+      usuarioSeleccionado: null,
       mostrarDetalleModal: false,
-      clienteAEliminar: null,
-      mostrarConfirmacionEliminar: false,
     };
   },
   mounted() {
-    this.obtenerClientes();
+    this.obtenerUsuarios();
   },
   methods: {
-    // Modal: nuevo cliente
-    abrirModalNuevo() {
-      console.log("Abrir modal para nuevo cliente");
-      this.clienteSeleccionado = null;
+    crearUsuario() {
+      this.usuarioSeleccionado = null;
       this.mostrarModal = true;
       document.body.classList.add("modal-open");
     },
-
-    // Modal: editar cliente
-    abrirModalEditar(cliente) {
-      console.log("Abrir modal para editar cliente:", cliente);
-      this.clienteSeleccionado = { ...cliente };
+    editarUsuario(usuario) {
+      this.usuarioSeleccionado = { ...usuario };
       this.mostrarModal = true;
+      document.body.classList.add("modal-open");
     },
-
     cerrarModal() {
       this.mostrarModal = false;
       document.body.classList.remove("modal-open");
     },
-
-    // Guardar cliente: nuevo o editado
-    guardarCliente(clienteActualizado) {
-      const datos = {
-        nombre: clienteActualizado.nombre,
-        email: clienteActualizado.email,
-        telefono: clienteActualizado.telefono,
-        rolId: clienteActualizado.rolId,
-        accedeAlSistema: clienteActualizado.accedeAlSistema,
-      };
-
-      console.log("guardarCliente - datos recibidos:", datos);
-
-      if (clienteActualizado.id) {
-        console.log("Editar cliente existente");
-        UsuarioService.actualizarCliente(clienteActualizado.id, datos)
-          .then(() => {
-            this.obtenerClientes();
-            this.cerrarModal();
-          })
-          .catch((error) => {
-            console.error("Error al editar cliente:", error);
-          });
-      } else {
-        console.log("Crear nuevo cliente");
-        UsuarioService.crearCliente(datos)
-          .then(() => {
-            this.obtenerClientes();
-            this.cerrarModal();
-          })
-          .catch((error) => {
-            console.error("Error al crear cliente:", error);
-          });
-      }
-    },
-    // Acciones de UI
-    crearCliente() {
-      this.abrirModalNuevo();
-    },
-
-    verDetalles(cliente) {
-      UsuarioService.getCliente(cliente.id)
+    verDetalles(usuario) {
+      UsuarioService.getUsuario(usuario.id)
         .then((res) => {
-          console.log("Detalle completo recibido:", res.data.usuario);
-          this.clienteSeleccionado = res.data.usuario;
+          this.usuarioSeleccionado = res.data.usuario;
           this.mostrarDetalleModal = true;
         })
-        .catch((err) => {
-          console.error("Error al obtener detalles del cliente:", err);
-          alert("No se pudo cargar el detalle del cliente.");
+        .catch(() => {
+          Swal.fire(
+            "Error",
+            "No se pudo cargar el detalle del usuario.",
+            "error"
+          );
         });
     },
-    editarCliente(cliente) {
-      this.clienteSeleccionado = { ...cliente };
-      this.abrirModalEditar(cliente);
-    },
-
-    eliminarCliente(cliente) {
+    eliminarUsuario(usuario) {
       Swal.fire({
-        title: `¿Eliminar a ${cliente.nombre}?`,
+        title: `¿Eliminar a ${usuario.nombre}?`,
         text: "Esta acción no se puede deshacer.",
         icon: "warning",
         showCancelButton: true,
@@ -314,52 +287,137 @@ export default {
         cancelButtonColor: "#6c757d",
         confirmButtonText: "Sí, eliminar",
         cancelButtonText: "Cancelar",
-        background: "#18181b", // fondo oscuro
-        color: "#fff", // texto blanco
+        background: "#18181b",
+        color: "#fff",
       }).then((result) => {
         if (result.isConfirmed) {
-          UsuarioService.eliminarCliente(cliente.id)
+          UsuarioService.eliminarUsuario(usuario.id)
             .then(() => {
               Swal.fire({
                 title: "Eliminado",
-                text: `El cliente ${cliente.nombre} ha sido eliminado.`,
+                text: `El usuario ${usuario.nombre} ha sido eliminado.`,
+                icon: "success",
+                timer: 2000,
+                timerProgressBar: true,
+                showConfirmButton: false,
+                background: "#18181b",
+                color: "#fff",
+              });
+              this.obtenerUsuarios(this.currentPage, this.pageSize);
+            })
+            .catch(() => {
+              Swal.fire("Error", "No se pudo eliminar el usuario.", "error");
+            });
+        }
+      });
+    },
+    reactivarUsuario(usuario) {
+      Swal.fire({
+        title: `¿Reactivar a ${usuario.nombre}?`,
+        text: "El usuario volverá a estar activo.",
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonColor: "#28a745",
+        cancelButtonColor: "#6c757d",
+        confirmButtonText: "Sí, reactivar",
+        cancelButtonText: "Cancelar",
+        background: "#18181b",
+        color: "#fff",
+      }).then((result) => {
+        if (result.isConfirmed) {
+          UsuarioService.cambiarEstado(usuario.id, true)
+            .then(() => {
+              Swal.fire({
+                title: "Reactivado",
+                text: `${usuario.nombre} ha sido reactivado.`,
                 icon: "success",
                 timer: 2000,
                 showConfirmButton: false,
                 background: "#18181b",
                 color: "#fff",
               });
-              this.obtenerClientes(this.currentPage, this.pageSize);
+              this.obtenerUsuarios(this.currentPage, this.pageSize);
             })
-            .catch((err) => {
-              console.error("Error al eliminar cliente:", err);
-              Swal.fire({
-                title: "Error",
-                text: "No se pudo eliminar el cliente.",
-                icon: "error",
-              });
+            .catch(() => {
+              Swal.fire("Error", "No se pudo reactivar el usuario.", "error");
             });
         }
       });
     },
-
-    confirmarEliminacion() {
-      UsuarioService.eliminarCliente(this.clienteAEliminar.id)
-        .then(() => {
-          this.obtenerClientes();
-          this.mostrarConfirmacionEliminar = false;
-          this.clienteAEliminar = null;
-        })
-        .catch((err) => {
-          console.error("Error al eliminar cliente:", err);
-          alert("Error al eliminar cliente");
+    guardarUsuario(usuarioActualizado) {
+      this.cerrarModal();
+      if (usuarioActualizado.id) {
+        // Actualizar usuario
+        Swal.fire({
+          title: `¿Actualizar a ${usuarioActualizado.nombre}?`,
+          icon: "question",
+          showCancelButton: true,
+          confirmButtonColor: "#3085d6",
+          cancelButtonColor: "#6c757d",
+          confirmButtonText: "Sí, actualizar",
+          cancelButtonText: "Cancelar",
+          background: "#18181b",
+          color: "#fff",
+        }).then(async (result) => {
+          if (result.isConfirmed) {
+            try {
+              await UsuarioService.actualizarUsuario(
+                usuarioActualizado.id,
+                usuarioActualizado
+              );
+              Swal.fire({
+                title: "Actualizado",
+                text: `Usuario ${usuarioActualizado.nombre} actualizado correctamente.`,
+                icon: "success",
+                timer: 2000,
+                timerProgressBar: true,
+                showConfirmButton: false,
+                background: "#18181b",
+                color: "#fff",
+              });
+              this.obtenerUsuarios(this.currentPage, this.pageSize);
+            } catch {
+              Swal.fire("Error", "No se pudo actualizar el usuario.", "error");
+            }
+          }
         });
+      } else {
+        // Crear usuario
+        Swal.fire({
+          title: "¿Crear nuevo usuario?",
+          icon: "question",
+          showCancelButton: true,
+          confirmButtonColor: "#3085d6",
+          cancelButtonColor: "#6c757d",
+          confirmButtonText: "Sí, crear",
+          cancelButtonText: "Cancelar",
+          background: "#18181b",
+          color: "#fff",
+        }).then(async (result) => {
+          if (result.isConfirmed) {
+            try {
+              await UsuarioService.crearUsuario(usuarioActualizado);
+              Swal.fire({
+                title: "Creado",
+                text: `Usuario ${usuarioActualizado.nombre} creado correctamente.`,
+                icon: "success",
+                timer: 2000,
+                timerProgressBar: true,
+                showConfirmButton: false,
+                background: "#18181b",
+                color: "#fff",
+              });
+              this.obtenerUsuarios(this.currentPage, this.pageSize);
+            } catch {
+              Swal.fire("Error", "No se pudo crear el usuario.", "error");
+            }
+          }
+        });
+      }
     },
-
-    // Carga de clientes con paginación, filtros y ordenamiento
-    obtenerClientes(page = 1, pageSize = 10) {
+    async obtenerUsuarios(page = 1, pageSize = 10) {
       console.log(
-        "Obteniendo clientes: página",
+        "Obteniendo usuarios: página",
         page,
         "tamaño página",
         pageSize
@@ -382,86 +440,40 @@ export default {
         filtrosAplicados.ordenDescendente = this.sortOrder === -1;
       }
 
-      UsuarioService.getClientes(page, pageSize, filtrosAplicados)
-        .then((res) => {
-          this.clientes = res.data.clientes;
-          console.log(
-            "Respuesta del backend - clientes recibidos:",
-            this.clientes
-          );
-          this.totalClients = res.data.pagination.total;
-          this.pageSize = pageSize;
-          this.currentPage = page;
-          this.first = (page - 1) * pageSize;
-        })
-        .catch((err) => {
-          console.error("Error al cargar clientes:", err);
-        })
-        .finally(() => {
-          this.loading = false;
-          console.log("Carga de clientes finalizada");
-        });
-    },
+      try {
+        const res = await UsuarioService.getUsuarios(
+          page,
+          pageSize,
+          filtrosAplicados
+        );
 
-    // Eventos de la tabla
+        this.usuarios = res.data.usuarios;
+        console.log(
+          "Respuesta del backend - usuarios recibidos:",
+          this.usuarios
+        );
+
+        this.totalUsuarios = res.data.pagination.total;
+        this.pageSize = pageSize;
+        this.currentPage = page;
+        this.first = (page - 1) * pageSize;
+      } catch (err) {
+        console.error("Error al cargar usuarios:", err);
+      } finally {
+        this.loading = false;
+        console.log("Carga de usuarios finalizada");
+      }
+    },
     onPageChange(event) {
-      console.log("Evento paginación:", event);
-      const newPage = event.page + 1;
-      const newPageSize = event.rows;
-      this.first = event.first;
-
-      this.obtenerClientes(newPage, newPageSize);
+      this.obtenerUsuarios(event.page + 1, event.rows);
     },
-
     onSort(event) {
-      console.log("Evento orden:", event);
       this.sortField = event.sortField;
       this.sortOrder = event.sortOrder;
-      this.obtenerClientes(1, this.pageSize);
+      this.obtenerUsuarios(this.currentPage, this.pageSize);
     },
-
-    onFilter() {
-      console.log("Evento filtro aplicado, filtros actuales:", this.filters);
-      this.obtenerClientes(1, this.pageSize);
-    },
-
-    aplicarFiltros() {
-      this.obtenerClientes(1, this.pageSize);
-    },
-    reactivarCliente(cliente) {
-      console.log("Reactivando cliente:", cliente);
-      Swal.fire({
-        title: `¿Reactivar a ${cliente.nombre}?`,
-        text: "El cliente volverá a estar activo.",
-        icon: "question",
-        showCancelButton: true,
-        confirmButtonColor: "#28a745",
-        cancelButtonColor: "#6c757d",
-        confirmButtonText: "Sí, reactivar",
-        cancelButtonText: "Cancelar",
-        background: "#18181b",
-        color: "#fff",
-      }).then((result) => {
-        if (result.isConfirmed) {
-          UsuarioService.cambiarEstado(cliente.id, true)
-            .then(() => {
-              Swal.fire({
-                title: "Reactivado",
-                text: `${cliente.nombre} ha sido reactivado.`,
-                icon: "success",
-                timer: 2000,
-                showConfirmButton: false,
-                background: "#18181b",
-                color: "#fff",
-              });
-              this.obtenerClientes(this.currentPage, this.pageSize);
-            })
-            .catch((err) => {
-              console.error("Error al reactivar cliente:", err);
-              Swal.fire("Error", "No se pudo reactivar el cliente.", "error");
-            });
-        }
-      });
+    onFilter(event) {
+      this.obtenerUsuarios(1, this.pageSize);
     },
   },
 };
@@ -471,7 +483,7 @@ export default {
 /* ===========================
    CONTENEDOR GENERAL
 =========================== */
-.clientes-container {
+.usuarios-container {
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
@@ -511,7 +523,7 @@ export default {
   border-color: transparent !important;
 }
 
-.boton-nuevo-cliente {
+.boton-nuevo-usuario {
   background-color: #28a745;
   color: white;
   font-weight: normal;
@@ -522,7 +534,7 @@ export default {
   height: auto !important;
   min-width: 120px !important;
 }
-.boton-nuevo-cliente:hover {
+.boton-nuevo-usuario:hover {
   background-color: #218838;
 }
 

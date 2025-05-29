@@ -23,32 +23,100 @@ namespace backend.Controllers
             _context = context;
         }
 
-        // GET: api/usuarios (Lista de usuarios)
+        // GET: api/usuarios (lista de usuarios con roles distintos a 3)
         [HttpGet]
-        public IActionResult GetUsuarios(int page = 1, int pageSize = 10)
+        public IActionResult GetUsuarios(
+            int page = 1,
+            int pageSize = 10,
+            string? nombre = null,
+            string? email = null,
+            string? telefono = null,
+            string? rolNombre = null,
+            bool? activo = null
+        )
         {
-            var totalUsuarios = _context.Usuario.Count(u => u.Activo);
-            var usuarios = _context
-                .Usuario.Where(u => u.Activo)
+            var query = _context.Usuario.Include(u => u.Rol).Where(u => u.RolId != 3).AsQueryable();
+
+            // Ordenamiento
+            string? ordenarPor = HttpContext.Request.Query["ordenarPor"];
+            string? ordenarDesc = HttpContext.Request.Query["ordenDescendente"];
+            bool ordenarDescendente = ordenarDesc == "true";
+
+            if (!string.IsNullOrEmpty(ordenarPor))
+            {
+                ordenarPor = ordenarPor.ToLower();
+                query = ordenarPor switch
+                {
+                    "nombre" => ordenarDescendente
+                        ? query.OrderByDescending(u => u.Nombre)
+                        : query.OrderBy(u => u.Nombre),
+                    "email" => ordenarDescendente
+                        ? query.OrderByDescending(u => u.Email)
+                        : query.OrderBy(u => u.Email),
+                    "telefono" => ordenarDescendente
+                        ? query.OrderByDescending(u => u.Telefono)
+                        : query.OrderBy(u => u.Telefono),
+                    "activo" => ordenarDescendente
+                        ? query.OrderByDescending(u => u.Activo)
+                        : query.OrderBy(u => u.Activo),
+                    "rolnombre" => ordenarDescendente
+                        ? query.OrderByDescending(u => u.Rol!.NombreRol)
+                        : query.OrderBy(u => u.Rol!.NombreRol),
+                    _ => query,
+                };
+            }
+            else
+            {
+                query = query.OrderBy(u => u.Nombre);
+            }
+
+            // Filtros
+            if (!string.IsNullOrEmpty(nombre))
+                query = query.Where(u => u.Nombre!.Contains(nombre));
+            if (!string.IsNullOrEmpty(email))
+                query = query.Where(u => u.Email!.Contains(email));
+            if (!string.IsNullOrEmpty(telefono))
+                query = query.Where(u => u.Telefono!.Contains(telefono));
+            if (!string.IsNullOrEmpty(rolNombre))
+                query = query.Where(u => u.Rol!.NombreRol.Contains(rolNombre));
+            if (activo.HasValue)
+                query = query.Where(u => u.Activo == activo.Value);
+
+            var total = query.Count();
+
+            var data = query
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
+                .Select(u => new UsuarioDto
+                {
+                    Id = u.Id,
+                    Nombre = u.Nombre!,
+                    Email = u.Email!,
+                    Telefono = u.Telefono!,
+                    Activo = u.Activo,
+                    RolId = u.RolId,
+                    RolNombre = u.Rol!.NombreRol,
+                })
                 .ToList();
+
+            string mensaje =
+                total > 0
+                    ? "Usuarios obtenidos correctamente."
+                    : "No se encontraron usuarios con esos filtros.";
 
             return Ok(
                 new
                 {
                     status = 200,
-                    message = totalUsuarios > 0
-                        ? "Lista de usuarios obtenida correctamente."
-                        : "No hay usuarios disponibles.",
+                    message = mensaje,
                     pagination = new
                     {
-                        totalPages = (int)Math.Ceiling((double)totalUsuarios / pageSize),
+                        totalPages = (int)Math.Ceiling((double)total / pageSize),
                         currentPage = page,
                         pageSize,
-                        totalUsuarios,
+                        total,
                     },
-                    usuarios = usuarios ?? new List<Usuario>(), // esto es para evitar nulls
+                    usuarios = data,
                 }
             );
         }
@@ -79,7 +147,7 @@ namespace backend.Controllers
             );
         }
 
-        // GET: api/usuarios/clientes
+        // GET: api/usuarios/clientes (lista de clientes)
         [HttpGet("clientes")]
         public IActionResult GetClientes(
             int page = 1,
@@ -234,7 +302,7 @@ namespace backend.Controllers
                     );
                 }
 
-                // 🔐 Validación de email duplicado
+                // Validación de email duplicado
                 var emailNormalizado = dto.Email?.Trim().ToLower();
                 bool emailExistente = _context.Usuario.Any(u =>
                     u.Email != null && u.Email.ToLower() == emailNormalizado

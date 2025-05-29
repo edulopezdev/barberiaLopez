@@ -4,7 +4,7 @@
     <Card>
       <template #title>
         <div class="encabezado-acciones">
-          <h4>Listado de Clientes</h4>
+          <h4>Clientes</h4>
           <div class="botones-acciones">
             <Button
               label="Filtros"

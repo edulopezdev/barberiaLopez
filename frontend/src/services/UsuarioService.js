@@ -1,5 +1,3 @@
-// src/services/UsuarioService.js
-
 import axios from "axios";
 
 const apiClient = axios.create({
@@ -41,9 +39,12 @@ export default {
       accedeAlSistema: usuarioData.accedeAlSistema ?? false,
     };
 
+    if (usuarioData.accedeAlSistema && usuarioData.password) {
+      data.password = usuarioData.password;
+    }
+
     return apiClient.post("/usuarios", data);
   },
-
   actualizarUsuario(id, usuarioData) {
     const data = {
       nombre: usuarioData.nombre,

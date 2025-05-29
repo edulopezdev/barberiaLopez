@@ -39,6 +39,8 @@ export default {
       Swal.fire({
         title: "Iniciando sesión...",
         allowOutsideClick: false,
+        background: "#18181b",
+        color: "#fff",
         didOpen: () => {
           Swal.showLoading();
 

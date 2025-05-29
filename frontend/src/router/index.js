@@ -5,6 +5,8 @@ import ClientesView from "../views/ClientesView.vue";
 import CrearCliente from "@/views/CrearCliente.vue";
 import EditarCliente from "@/views/EditarCliente.vue";
 
+import UsuariosView from "../views/UsuariosView.vue";
+
 import LoginView from "../views/LoginView.vue";
 import DashboardView from "../views/DashboardView.vue";
 import authService from "../services/auth.service";
@@ -49,6 +51,12 @@ const routes = [
   {
     path: "/:catchAll(.*)", // Redirige cualquier ruta no existente al login
     redirect: "/login",
+  },
+  {
+    path: "/usuarios",
+    name: "Usuarios",
+    component: UsuariosView,
+    meta: { requiresAuth: true },
   },
 ];
 
