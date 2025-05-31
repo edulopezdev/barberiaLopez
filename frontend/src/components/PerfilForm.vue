@@ -1,7 +1,8 @@
 <template>
   <div class="formulario-cliente usuario-form">
-    <h3>{{ form.id ? "Editar Usuario" : "Nuevo Usuario" }}</h3>
+    <h3>Editar Perfil</h3>
 
+    <!-- Nombre -->
     <div class="campo" :class="{ error: errores.nombre }">
       <label for="nombre">Nombre <span class="obligatorio">*</span></label>
       <InputText id="nombre" v-model="form.nombre" autofocus />
@@ -10,6 +11,7 @@
       </div>
     </div>
 
+    <!-- Email -->
     <div class="campo" :class="{ error: errores.email }">
       <label for="email">Email <span class="obligatorio">*</span></label>
       <InputText id="email" v-model="form.email" type="email" />
@@ -18,6 +20,7 @@
       </div>
     </div>
 
+    <!-- Teléfono -->
     <div class="campo" :class="{ error: errores.telefono }">
       <label for="telefono">Teléfono</label>
       <InputText
@@ -31,7 +34,9 @@
         <i class="pi pi-exclamation-triangle"></i> {{ errores.telefono }}
       </div>
     </div>
-    <div class="campo" v-if="esPerfil">
+
+    <!-- Rol actual (solo lectura) -->
+    <div class="campo">
       <label for="rolActual">Rol Actual</label>
       <InputText
         id="rolActual"
@@ -40,30 +45,40 @@
         style="background-color: #2d2d2d; color: #ffffff"
       />
     </div>
-    <div class="campo" :class="{ error: errores.rolId }" v-if="!esPerfil">
-      <label for="rol">Rol <span class="obligatorio">*</span></label>
-      <Dropdown
-        id="rol"
-        v-model="form.rolId"
-        :options="roles"
-        optionLabel="label"
-        optionValue="value"
-        placeholder="Seleccionar rol"
-      />
-      <div v-if="errores.rolId" class="error-msg">
-        <i class="pi pi-exclamation-triangle"></i> {{ errores.rolId }}
+
+    <!-- Avatar -->
+    <div class="campo">
+      <label>Avatar</label>
+      <div class="avatar-preview">
+        <img :src="avatarUrl" alt="Avatar" />
+      </div>
+      <div class="avatar-actions">
+        <FileUpload
+          mode="basic"
+          name="avatar"
+          accept="image/*"
+          chooseLabel=""
+          chooseIcon="pi pi-pencil"
+          @select="onAvatarSeleccionado"
+          :auto="true"
+          customUpload
+          class="boton-avatar fileupload-icon"
+        />
+
+        <Button
+          icon="pi pi-trash"
+          class="boton-avatar boton-avatar-eliminar"
+          @click="eliminarAvatar"
+          v-if="form.avatar || previewAvatar"
+        />
       </div>
     </div>
 
-    <!-- Contraseña solo al crear -->
+    <!-- Contraseña -->
     <div class="campo" :class="{ error: errores.password }">
       <label for="password">
-        Contraseña
-        <span v-if="!form.id" class="obligatorio">*</span>
-        <small
-          v-if="form.id"
-          style="font-weight: normal; font-size: 0.8rem; color: #666"
-        >
+        Nueva Contraseña
+        <small style="font-weight: normal; font-size: 0.8rem; color: #666">
           (Dejar vacío para no cambiar)
         </small>
       </label>
@@ -82,7 +97,7 @@
       <div class="contenedor-boton">
         <Button
           class="btn-guardar"
-          :label="form.id ? 'Actualizar' : 'Guardar'"
+          label="Guardar"
           icon="pi pi-check"
           @click="onGuardar"
         />
@@ -96,15 +111,14 @@
 
 <script>
 import InputText from "primevue/inputtext";
-import Dropdown from "primevue/dropdown";
 import Button from "primevue/button";
+import FileUpload from "primevue/fileupload";
 
 export default {
-  name: "UsuarioForm",
-  components: { InputText, Dropdown, Button },
+  name: "PerfilForm",
+  components: { InputText, Button, FileUpload },
   props: {
     usuario: Object,
-    esPerfil: { type: Boolean, default: false },
   },
   data() {
     return {
@@ -113,18 +127,17 @@ export default {
         nombre: "",
         email: "",
         telefono: "",
-        rolId: null,
+        rolNombre: "",
+        avatar: "",
         password: "",
+        nuevoAvatar: null,
+        eliminarAvatarFlag: false,
       },
-      roles: [
-        { label: "Administrador", value: 1 },
-        { label: "Barbero", value: 2 },
-      ],
+      previewAvatar: null,
       errores: {
         nombre: null,
         email: null,
         telefono: null,
-        rolId: null,
         password: null,
       },
     };
@@ -136,8 +149,9 @@ export default {
         nombre: this.usuario.nombre || "",
         email: this.usuario.email || "",
         telefono: this.usuario.telefono || "",
-        rolId: this.usuario.rolId || null,
-        rolNombre: this.usuario.rolNombre || "",
+        rolNombre:
+          this.usuario.rolNombre || this.usuario.rol?.nombre || "No definido",
+        avatar: this.usuario.avatar || "",
         password: "",
       };
     }
@@ -149,13 +163,24 @@ export default {
         event.preventDefault();
       }
     },
+    onAvatarSeleccionado(event) {
+      const file = event.files[0];
+      if (file) {
+        this.form.nuevoAvatar = file;
+        this.previewAvatar = URL.createObjectURL(file);
+      }
+    },
+    eliminarAvatar() {
+      this.form.avatar = null;
+      this.form.nuevoAvatar = null;
+      this.previewAvatar = null;
+      this.eliminarAvatarFlag = true;
+    },
     validarFormulario() {
-      console.log("Validando formulario...", this.form);
       this.errores = {
         nombre: null,
         email: null,
         telefono: null,
-        rolId: null,
         password: null,
       };
       let valido = true;
@@ -175,34 +200,50 @@ export default {
         this.errores.telefono = "El teléfono debe contener solo números.";
         valido = false;
       }
-      if (!this.esPerfil && !this.form.rolId) {
-        this.errores.rolId = "El rol es obligatorio.";
-        valido = false;
-      }
-
-      // Solo validar password si es nuevo usuario
-      if (!this.form.id && !this.form.password) {
-        this.errores.password = "La contraseña es obligatoria.";
-        valido = false;
-      }
 
       return valido;
     },
     onGuardar() {
-      console.log("Click en guardar");
-
       if (!this.validarFormulario()) return;
-      console.warn("Formulario inválido", this.errores);
 
-      const datos = { ...this.form };
+      const formData = new FormData();
 
-      if (!datos.password) {
-        delete datos.password; // No enviamos contraseña vacía para no modificarla
+      formData.append("Nombre", this.form.nombre);
+      formData.append("Email", this.form.email);
+      if (this.form.telefono) formData.append("Telefono", this.form.telefono);
+      if (this.form.password) formData.append("Password", this.form.password);
+
+      if (this.form.nuevoAvatar) {
+        formData.append("Avatar", this.form.nuevoAvatar);
       }
 
-      datos.accedeAlSistema = true; // siempre por defecto
+      if (this.eliminarAvatarFlag) {
+        formData.append("EliminarAvatar", "true");
+      }
 
-      this.$emit("guardar", datos);
+      this.$emit("guardar", formData);
+    },
+  },
+  computed: {
+    avatarUrl() {
+      if (this.previewAvatar) return this.previewAvatar;
+
+      if (this.form.avatar) {
+        // Si form.avatar ya tiene la URL completa, devuélvela
+        if (this.form.avatar.startsWith("http")) {
+          return this.form.avatar;
+        }
+
+        // Usa VITE_API_BASE_URL o localhost:5042
+        const baseUrl =
+          import.meta.env.VITE_API_BASE_URL || "http://localhost:5042";
+
+        // Si form.avatar es algo como "/avatars/123.jpg"
+        return `${baseUrl}${this.form.avatar}`;
+      }
+
+      // Avatar por defecto
+      return "/img/avatar-placeholder.png";
     },
   },
 };
@@ -281,20 +322,6 @@ label {
   margin-top: 1.5rem;
 }
 
-.p-button.p-button-danger {
-  background-color: #e74c3c;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  padding: 0.5rem 1.2rem;
-  transition: background-color 0.3s ease, box-shadow 0.3s ease;
-}
-
-.p-button.p-button-danger:hover {
-  background-color: #c0392b;
-  box-shadow: 0 0 8px #c0392b88;
-}
-
 .p-button {
   background-color: #4a90e2;
   color: white;
@@ -308,4 +335,98 @@ label {
   background-color: #357abd;
   box-shadow: 0 0 8px #357abd88;
 }
+
+.p-button.p-button-danger {
+  background-color: #e74c3c;
+  color: white;
+  border-radius: 6px;
+  padding: 0.5rem 1.2rem;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.p-button.p-button-danger:hover {
+  background-color: #c0392b;
+  box-shadow: 0 0 8px #c0392b88;
+}
+
+.toolbar-buttons {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+
+.icon-button {
+  width: 2.2rem;
+  height: 2.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 1rem;
+}
+
+.avatar-actions {
+  display: flex;
+  gap: 0.3rem;
+  margin-top: 0.5rem;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.boton-avatar {
+  background-color: transparent !important;
+  border: none !important;
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  padding: 0.25rem !important;
+  font-size: 0.9rem;
+  color: #ffffff !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: none !important;
+  border-radius: 6px !important;
+  transition: background-color 0.2s ease;
+}
+
+.boton-avatar:hover {
+  background-color: #2e2e2e !important;
+}
+
+.boton-avatar-eliminar:hover {
+  background-color: #c0392b !important;
+}
+
+/* FileUpload button styling */
+/* Oculta el texto dentro del botón choose y centra el ícono */
+:deep(.p-fileupload-choose .p-button-label) {
+  display: none !important;
+}
+
+/* Asegura que el icono esté centrado y con estilo igual al botón eliminar */
+:deep(.p-fileupload-choose) {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0.25rem !important;
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  border-radius: 6px !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff !important;
+  font-size: 1rem;
+  transition: background-color 0.2s ease;
+  cursor: pointer;
+}
+
+:deep(.p-fileupload-choose:hover) {
+  background-color: #2e2e2e !important;
+}
+
+
 </style>

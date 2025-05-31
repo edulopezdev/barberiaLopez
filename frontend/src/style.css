@@ -82,16 +82,16 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
-.swal2-container {
+/* .swal2-container {
   background-color: rgba(
     167,
     255,
     177,
     0.194
-  ) !important; /* color semitransparente */
-  backdrop-filter: blur(5px); /* efecto blur */
-  -webkit-backdrop-filter: blur(5px); /* soporte Safari */
-}
+  ) !important;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px); 
+} */
 
 .card {
   padding: 2em;

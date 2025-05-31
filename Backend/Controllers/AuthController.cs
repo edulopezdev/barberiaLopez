@@ -74,6 +74,7 @@ namespace backend.Controllers
                         usuario.Email,
                         usuario.RolId,
                         RolNombre = usuario.Rol?.NombreRol,
+                        usuario.Avatar,
                     },
                 }
             );

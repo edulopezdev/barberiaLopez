@@ -2,18 +2,19 @@
   <div class="app-topbar">
     <Toolbar class="toolbar">
       <template #start>
-        <div class="topbar-left"></div>
+        <div class="topbar-left">
+          <!-- Logo u otros elementos -->
+        </div>
       </template>
 
       <template #end>
         <div v-if="usuarioLogueado" class="usuario-info">
-          <img
-            v-if="usuarioLogueado.avatarUrl"
-            :src="usuarioLogueado.avatarUrl"
-            alt="Avatar"
-            class="avatar"
-          />
-          <span class="nombre-usuario">{{ usuarioLogueado.email }}</span>
+          <div class="usuario-datos">
+            <img :src="usuarioLogueado.avatarUrl" alt="Avatar" class="avatar" />
+
+            <span class="nombre-usuario">{{ usuarioLogueado.email }}</span>
+          </div>
+
           <Button
             icon="pi pi-sign-out"
             class="logout-btn"
@@ -33,7 +34,7 @@
 import Toolbar from "primevue/toolbar";
 import Button from "primevue/button";
 import authService from "../services/auth.service";
-import { confirmDialog } from "../utils/confirmDialog"; // Importamos la función reusable
+import { confirmDialog } from "../utils/confirmDialog";
 import Swal from "sweetalert2";
 
 export default {
@@ -44,11 +45,33 @@ export default {
   },
   data() {
     return {
-      usuarioLogueado: null,
+      // No usamos data, lo movimos a computed
     };
   },
-  mounted() {
-    this.usuarioLogueado = authService.getUser();
+  computed: {
+    usuarioLogueado() {
+      const usuario = authService.getUser();
+      if (!usuario) return null;
+
+      const baseUrl =
+        import.meta.env.VITE_API_BASE_URL || "http://localhost:5042";
+
+      const avatar =
+        usuario.avatar && usuario.avatar.trim()
+          ? `${baseUrl.replace(/\/$/, "")}/${usuario.avatar.replace(/^\//, "")}`
+          : "/avatars/no_avatar.jpg";
+
+      return {
+        ...usuario,
+        avatarUrl: avatar,
+      };
+    },
+  },
+  watch: {
+    // Opcional: escuchar cambios en usuarioLogueado
+    usuarioLogueado(newVal) {
+      console.log("Usuario logueado actualizado:", newVal);
+    },
   },
   methods: {
     async logout() {
@@ -59,7 +82,6 @@ export default {
 
       if (result.isConfirmed) {
         authService.logout();
-        this.usuarioLogueado = null;
         this.$router.push("/login");
 
         Swal.fire({
@@ -97,16 +119,16 @@ export default {
   align-items: center;
 }
 
-.topbar-left {
+.usuario-info {
   display: flex;
   align-items: center;
   gap: 1rem;
 }
 
-.usuario-info {
+.usuario-datos {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
 .nombre-usuario {
@@ -115,10 +137,11 @@ export default {
 }
 
 .avatar {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   object-fit: cover;
+  border: 2px solid #4a90e2;
 }
 
 .logout-btn {

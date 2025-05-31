@@ -15,7 +15,7 @@
 
       <div class="campo">
         <label><i class="pi pi-user-edit"></i> Rol</label>
-        <p>{{ usuario?.rol || "No asignado" }}</p>
+        <p>{{ usuario?.rolNombre ? usuario.rolNombre : "No asignado" }}</p>
       </div>
     </div>
 

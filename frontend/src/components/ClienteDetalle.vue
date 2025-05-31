@@ -67,7 +67,7 @@ export default {
   emits: ["cerrar"],
   methods: {
     formatearFecha(fecha) {
-      if (!fecha) return "No disponible";
+      if (!fecha) return "No se modificó nunca";
       const d = new Date(fecha);
       return d.toLocaleDateString("es-AR", {
         day: "2-digit",

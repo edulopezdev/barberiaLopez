@@ -92,16 +92,32 @@ export default {
     return apiClient.post("/usuarios", data);
   },
 
-  actualizarCliente(id, clienteData) {
-    const dataParaEnviar = {
-      nombre: clienteData.nombre,
-      email: clienteData.email,
-      telefono: clienteData.telefono,
-      rolId: 3,
-      accedeAlSistema: false,
-      activo: clienteData.activo,
+  actualizarUsuario(id, usuarioData) {
+    const data = {
+      nombre: usuarioData.nombre,
+      email: usuarioData.email,
+      telefono: usuarioData.telefono,
+      rolId: usuarioData.rolId,
+      accedeAlSistema: usuarioData.accedeAlSistema ?? false,
+      activo: usuarioData.activo,
     };
-    console.log("Datos para actualizar al backend:", dataParaEnviar);
-    return apiClient.put(`/usuarios/${id}`, dataParaEnviar);
+
+    if (usuarioData.password && usuarioData.password.trim() !== "") {
+      data.password = usuarioData.password;
+    }
+
+    return apiClient.put(`/usuarios/${id}`, data);
+  },
+
+  getPerfil() {
+    return apiClient.get("/usuarios/perfil");
+  },
+
+  actualizarPerfil(usuarioData) {
+    return apiClient.put("/usuarios/perfil", usuarioData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
   },
 };

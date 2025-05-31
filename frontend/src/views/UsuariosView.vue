@@ -16,7 +16,7 @@
               label="Nuevo Usuario"
               icon="pi pi-plus"
               class="boton-nuevo-usuario"
-              @click="crearUsuario"
+              @click="abrirModalNuevo()"
             />
           </div>
         </div>
@@ -128,7 +128,7 @@
                   text
                   rounded
                   v-tooltip.bottom="'Editar usuario'"
-                  @click="editarUsuario(slotProps.data)"
+                  @click="abrirModalEditar(slotProps.data)"
                 />
                 <Button
                   :icon="
@@ -152,10 +152,13 @@
             </template>
           </Column>
         </DataTable>
+
+        <div class="total-usuarios" v-if="totalUsuarios > 0">
+          Total de usuarios registrados: {{ totalUsuarios }}
+        </div>
       </template>
     </Card>
 
-    <!-- Modal Crear / Editar Usuario -->
     <Dialog
       v-model:visible="mostrarModal"
       :header="usuarioSeleccionado?.id ? 'Editar Usuario' : 'Nuevo Usuario'"
@@ -172,7 +175,6 @@
       />
     </Dialog>
 
-    <!-- Modal Detalle Usuario -->
     <Dialog
       v-model:visible="mostrarDetalleModal"
       header="Detalle del Usuario"
@@ -249,12 +251,12 @@ export default {
     this.obtenerUsuarios();
   },
   methods: {
-    crearUsuario() {
-      this.usuarioSeleccionado = null;
+    abrirModalNuevo(usuario = null) {
+      this.usuarioSeleccionado = usuario;
       this.mostrarModal = true;
       document.body.classList.add("modal-open");
     },
-    editarUsuario(usuario) {
+    abrirModalEditar(usuario) {
       this.usuarioSeleccionado = { ...usuario };
       this.mostrarModal = true;
       document.body.classList.add("modal-open");
@@ -305,12 +307,24 @@ export default {
               });
               this.obtenerUsuarios(this.currentPage, this.pageSize);
             })
-            .catch(() => {
-              Swal.fire("Error", "No se pudo eliminar el usuario.", "error");
+            .catch((error) => {
+              // Extraer mensaje personalizado del backend o fallback
+              const backendMessage =
+                error?.response?.data?.message ||
+                "No se pudo eliminar el usuario.";
+
+              Swal.fire({
+                title: "Error",
+                text: backendMessage,
+                icon: "error",
+                background: "#18181b",
+                color: "#fff",
+              });
             });
         }
       });
     },
+
     reactivarUsuario(usuario) {
       Swal.fire({
         title: `¿Reactivar a ${usuario.nombre}?`,
@@ -344,11 +358,11 @@ export default {
         }
       });
     },
-    guardarUsuario(usuarioActualizado) {
-      this.cerrarModal();
+    async guardarUsuario(usuarioActualizado) {
       if (usuarioActualizado.id) {
-        // Actualizar usuario
-        Swal.fire({
+        this.cerrarModal();
+
+        const result = await Swal.fire({
           title: `¿Actualizar a ${usuarioActualizado.nombre}?`,
           icon: "question",
           showCancelButton: true,
@@ -358,33 +372,50 @@ export default {
           cancelButtonText: "Cancelar",
           background: "#18181b",
           color: "#fff",
-        }).then(async (result) => {
-          if (result.isConfirmed) {
-            try {
-              await UsuarioService.actualizarUsuario(
-                usuarioActualizado.id,
-                usuarioActualizado
-              );
-              Swal.fire({
-                title: "Actualizado",
-                text: `Usuario ${usuarioActualizado.nombre} actualizado correctamente.`,
-                icon: "success",
-                timer: 2000,
-                timerProgressBar: true,
-                showConfirmButton: false,
-                background: "#18181b",
-                color: "#fff",
-              });
-              this.obtenerUsuarios(this.currentPage, this.pageSize);
-            } catch {
-              Swal.fire("Error", "No se pudo actualizar el usuario.", "error");
-            }
-          }
         });
+
+        if (result.isConfirmed) {
+          try {
+            await UsuarioService.actualizarUsuario(
+              usuarioActualizado.id,
+              usuarioActualizado
+            );
+            await Swal.fire({
+              title: "Actualizado",
+              text: `Usuario ${usuarioActualizado.nombre} actualizado correctamente.`,
+              icon: "success",
+              timer: 2000,
+              timerProgressBar: true,
+              showConfirmButton: false,
+              background: "#18181b",
+              color: "#fff",
+            });
+            this.obtenerUsuarios();
+            this.verDetalles(usuarioActualizado);
+          } catch (error) {
+            console.error("Error completo:", error);
+            const mensaje =
+              error?.response?.data?.message ||
+              "No se pudo actualizar el usuario.";
+
+            await Swal.fire({
+              title: "Error",
+              text: mensaje,
+              icon: "error",
+              background: "#18181b",
+              color: "#fff",
+            });
+
+            this.abrirModalEditar({ ...usuarioActualizado });
+          }
+        } else {
+          this.abrirModalEditar(usuarioActualizado);
+        }
       } else {
-        // Crear usuario
-        Swal.fire({
-          title: "¿Crear nuevo usuario?",
+        this.cerrarModal();
+
+        const result = await Swal.fire({
+          title: `¿Crear usuario ${usuarioActualizado.nombre}?`,
           icon: "question",
           showCancelButton: true,
           confirmButtonColor: "#3085d6",
@@ -393,35 +424,44 @@ export default {
           cancelButtonText: "Cancelar",
           background: "#18181b",
           color: "#fff",
-        }).then(async (result) => {
-          if (result.isConfirmed) {
-            try {
-              await UsuarioService.crearUsuario(usuarioActualizado);
-              Swal.fire({
-                title: "Creado",
-                text: `Usuario ${usuarioActualizado.nombre} creado correctamente.`,
-                icon: "success",
-                timer: 2000,
-                timerProgressBar: true,
-                showConfirmButton: false,
-                background: "#18181b",
-                color: "#fff",
-              });
-              this.obtenerUsuarios(this.currentPage, this.pageSize);
-            } catch {
-              Swal.fire("Error", "No se pudo crear el usuario.", "error");
-            }
-          }
         });
+
+        if (result.isConfirmed) {
+          try {
+            await UsuarioService.crearUsuario(usuarioActualizado);
+            await Swal.fire({
+              title: "Creado",
+              text: "Usuario creado correctamente.",
+              icon: "success",
+              timer: 2000,
+              timerProgressBar: true,
+              showConfirmButton: false,
+              background: "#18181b",
+              color: "#fff",
+            });
+            this.obtenerUsuarios();
+          } catch (error) {
+            console.error(error);
+
+            const mensaje =
+              error?.response?.data?.message || "No se pudo crear el usuario.";
+
+            await Swal.fire({
+              title: "Error",
+              text: mensaje,
+              icon: "error",
+              background: "#18181b",
+              color: "#fff",
+            });
+
+            this.abrirModalNuevo({ ...usuarioActualizado });
+          }
+        } else {
+          this.abrirModalNuevo(usuarioActualizado);
+        }
       }
     },
     async obtenerUsuarios(page = 1, pageSize = 10) {
-      console.log(
-        "Obteniendo usuarios: página",
-        page,
-        "tamaño página",
-        pageSize
-      );
       this.loading = true;
 
       const filtrosAplicados = {};
@@ -448,11 +488,6 @@ export default {
         );
 
         this.usuarios = res.data.usuarios;
-        console.log(
-          "Respuesta del backend - usuarios recibidos:",
-          this.usuarios
-        );
-
         this.totalUsuarios = res.data.pagination.total;
         this.pageSize = pageSize;
         this.currentPage = page;
@@ -461,7 +496,6 @@ export default {
         console.error("Error al cargar usuarios:", err);
       } finally {
         this.loading = false;
-        console.log("Carga de usuarios finalizada");
       }
     },
     onPageChange(event) {
@@ -472,7 +506,7 @@ export default {
       this.sortOrder = event.sortOrder;
       this.obtenerUsuarios(this.currentPage, this.pageSize);
     },
-    onFilter(event) {
+    onFilter() {
       this.obtenerUsuarios(1, this.pageSize);
     },
   },
@@ -588,12 +622,12 @@ export default {
   justify-content: center !important;
 }
 
-:deep(.p-datatable-thead > tr > th:nth-child(5)) /* Acciones */ {
+:deep(.p-datatable-thead > tr > th:nth-child(6)) /* Acciones */ {
   text-align: center !important;
   vertical-align: middle !important;
 }
 
-:deep(.p-datatable-thead > tr > th:nth-child(5) .p-column-header-content) {
+:deep(.p-datatable-thead > tr > th:nth-child(6) .p-column-header-content) {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -767,5 +801,12 @@ export default {
 .icono-filtro:hover {
   transform: scale(1.2);
   color: #28a745;
+}
+.total-usuarios {
+  margin-top: 1.9rem;
+  font-size: 1rem;
+  font-weight: 500;
+  text-align: left;
+  color: #aeaeae;
 }
 </style>

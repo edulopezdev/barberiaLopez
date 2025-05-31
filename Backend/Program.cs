@@ -131,6 +131,9 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+//esto va a servir el contenido estatico desde la carpeta wwwroot
+app.UseStaticFiles();
+
 app.UseAuthentication();
 
 // Aplica la política de CORS después de autenticación pero antes de autorización

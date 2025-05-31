@@ -3,11 +3,15 @@ using System.Security.Claims;
 using System.Text;
 using backend.Data;
 using backend.Dtos;
+using backend.Extensions;
 using backend.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.Processing;
 
 namespace backend.Controllers
 {
@@ -25,6 +29,7 @@ namespace backend.Controllers
 
         // GET: api/usuarios (lista de usuarios con roles distintos a 3)
         [HttpGet]
+        [Authorize(Roles = "Administrador")]
         public IActionResult GetUsuarios(
             int page = 1,
             int pageSize = 10,
@@ -123,6 +128,7 @@ namespace backend.Controllers
 
         // GET: api/usuarios/usuarios-sistema
         [HttpGet("usuarios-sistema")]
+        [Authorize(Roles = "Administrador")]
         public IActionResult GetUsuariosSistema(int page = 1, int pageSize = 10)
         {
             var query = _context.Usuario.Where(u => u.Activo && (u.RolId == 1 || u.RolId == 2));
@@ -149,6 +155,7 @@ namespace backend.Controllers
 
         // GET: api/usuarios/clientes (lista de clientes)
         [HttpGet("clientes")]
+        [Authorize(Roles = "Administrador,Barbero")]
         public IActionResult GetClientes(
             int page = 1,
             int pageSize = 10,
@@ -247,9 +254,13 @@ namespace backend.Controllers
 
         // GET: api/usuarios/{id} (Un usuario específico)
         [HttpGet("{id}")]
+        [Authorize(Roles = "Administrador,Barbero")]
         public async Task<IActionResult> GetUsuario(int id)
         {
-            var usuario = await _context.Usuario.FindAsync(id);
+            var usuario = await _context
+                .Usuario.Include(u => u.Rol)
+                .FirstOrDefaultAsync(u => u.Id == id);
+
             if (usuario == null)
             {
                 return NotFound(
@@ -262,26 +273,50 @@ namespace backend.Controllers
                 );
             }
 
+            var rolActual = User.GetUserRole();
+
+            // Barbero solo puede ver clientes
+            if (rolActual == "Barbero" && usuario.RolId != 3)
+            {
+                return Forbid("No tienes permiso para ver este usuario.");
+            }
+
+            var usuarioDto = new UsuarioDto
+            {
+                Id = usuario.Id,
+                Nombre = usuario.Nombre,
+                Email = usuario.Email,
+                Telefono = usuario.Telefono,
+                Avatar = !string.IsNullOrEmpty(usuario.Avatar)
+                    ? usuario.Avatar
+                    : "/avatars/no_avatar.jpg",
+                RolId = usuario.RolId,
+                AccedeAlSistema = usuario.AccedeAlSistema,
+                Activo = usuario.Activo,
+                FechaRegistro = usuario.FechaRegistro,
+                FechaModificacion = usuario.FechaModificacion,
+                RolNombre = usuario.Rol?.NombreRol ?? string.Empty,
+            };
+
             return Ok(
                 new
                 {
                     status = 200,
                     message = "Usuario encontrado.",
-                    usuario,
+                    usuario = usuarioDto,
                 }
             );
         }
 
         // POST: api/usuarios (Crear un nuevo usuario)
         [HttpPost]
+        [Authorize(Roles = "Administrador,Barbero")]
         public IActionResult PostUsuario([FromBody] CrearUsuarioDto dto)
         {
             try
             {
-                var usuarioIdLogueado = int.Parse(
-                    User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0"
-                );
-                var esAdministrador = User.IsInRole("Administrador");
+                var usuarioIdLogueado = User.GetUserId() ?? 0;
+                var rolActual = User.FindFirst(ClaimTypes.Role)?.Value;
 
                 if (!ModelState.IsValid)
                 {
@@ -295,14 +330,13 @@ namespace backend.Controllers
                     );
                 }
 
-                if (dto.RolId != 3 && !esAdministrador)
+                // Validar que un Barbero solo cree clientes
+                if (rolActual == "Barbero" && dto.RolId != 3)
                 {
-                    return Unauthorized(
-                        new { status = 401, message = "No puedes crear usuarios con este rol." }
-                    );
+                    return Forbid("No tienes permiso para crear usuarios con este rol.");
                 }
 
-                // Validación de email duplicado
+                // Validar email duplicado
                 var emailNormalizado = dto.Email?.Trim().ToLower();
                 bool emailExistente = _context.Usuario.Any(u =>
                     u.Email != null && u.Email.ToLower() == emailNormalizado
@@ -330,7 +364,7 @@ namespace backend.Controllers
 
                 if (usuario.RolId == 3)
                 {
-                    usuario.AccedeAlSistema = false; // por las dudas
+                    usuario.AccedeAlSistema = false; // clientes no acceden al sistema
                 }
 
                 if (usuario.AccedeAlSistema)
@@ -345,13 +379,11 @@ namespace backend.Controllers
                             }
                         );
                     }
-
                     usuario.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
                 }
-
-                if (!usuario.AccedeAlSistema)
+                else
                 {
-                    usuario.PasswordHash = BCrypt.Net.BCrypt.HashPassword("123");
+                    usuario.PasswordHash = BCrypt.Net.BCrypt.HashPassword("123"); // password por defecto para clientes
                 }
 
                 _context.Usuario.Add(usuario);
@@ -391,6 +423,7 @@ namespace backend.Controllers
 
         // PUT: api/usuarios/{id}
         [HttpPut("{id}")]
+        [Authorize(Roles = "Administrador,Barbero")]
         public IActionResult PutUsuario(int id, [FromBody] EditarUsuarioDto dto)
         {
             if (!ModelState.IsValid)
@@ -406,7 +439,6 @@ namespace backend.Controllers
                 );
             }
 
-            // Intentar obtener el Id del usuario logueado (puede ser null)
             var usuarioIdLogueadoString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             int usuarioIdLogueado = 0;
             if (
@@ -414,22 +446,11 @@ namespace backend.Controllers
                 && !int.TryParse(usuarioIdLogueadoString, out usuarioIdLogueado)
             )
             {
-                usuarioIdLogueado = 0; // Por defecto
+                usuarioIdLogueado = 0;
             }
 
             var esAdministrador = User.IsInRole("Administrador");
-
-            if (usuarioIdLogueado != id && !esAdministrador)
-            {
-                return Unauthorized(
-                    new
-                    {
-                        status = 401,
-                        code = "SIN_AUTORIZACION",
-                        message = "No tienes permisos para modificar este usuario.",
-                    }
-                );
-            }
+            var esBarbero = User.IsInRole("Barbero");
 
             var usuarioExistente = _context.Usuario.Find(id);
             if (usuarioExistente == null)
@@ -444,6 +465,41 @@ namespace backend.Controllers
                 );
             }
 
+            // Validaciones de permisos
+            if (esBarbero)
+            {
+                // Barbero solo puede editar clientes
+                if (usuarioExistente.RolId != 3)
+                {
+                    return Forbid("No tienes permiso para modificar este usuario.");
+                }
+
+                // No puede cambiar el rol del cliente (debe seguir siendo cliente)
+                if (dto.RolId != 3)
+                {
+                    return Forbid("No puedes cambiar el rol de un cliente.");
+                }
+
+                // No puede cambiar su propio rol (aunque en lógica solo puede editar clientes, por seguridad)
+                if (usuarioExistente.Id == usuarioIdLogueado && dto.RolId != usuarioExistente.RolId)
+                {
+                    return Forbid("No puedes cambiar tu propio rol.");
+                }
+            }
+            else if (!esAdministrador)
+            {
+                // Si no es admin ni barbero, no tiene permiso
+                return Unauthorized(
+                    new
+                    {
+                        status = 401,
+                        code = "SIN_AUTORIZACION",
+                        message = "No tienes permisos para modificar este usuario.",
+                    }
+                );
+            }
+
+            // Validar email duplicado
             var nuevoEmail = dto.Email?.Trim().ToLower();
             var emailActual = usuarioExistente.Email?.Trim().ToLower();
 
@@ -471,7 +527,13 @@ namespace backend.Controllers
             usuarioExistente.Email = dto.Email?.Trim() ?? usuarioExistente.Email;
             usuarioExistente.Telefono = dto.Telefono;
             usuarioExistente.Avatar = dto.Avatar;
-            usuarioExistente.RolId = dto.RolId;
+
+            // Solo admin puede cambiar rol
+            if (esAdministrador)
+            {
+                usuarioExistente.RolId = dto.RolId;
+            }
+
             usuarioExistente.AccedeAlSistema = dto.AccedeAlSistema;
             usuarioExistente.Activo = dto.Activo ?? usuarioExistente.Activo;
             usuarioExistente.IdUsuarioModifica = usuarioIdLogueado;
@@ -508,39 +570,164 @@ namespace backend.Controllers
 
         // DELETE: api/usuarios/{id} (Eliminación lógica)
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Administrador")]
         public async Task<IActionResult> DeleteUsuario(int id)
         {
+            var idUsuarioActual = User.GetUserId();
+
+            if (idUsuarioActual == null)
+            {
+                return Unauthorized(
+                    new
+                    {
+                        status = 401,
+                        error = "Unauthorized",
+                        message = "No se pudo determinar la identidad del usuario actual.",
+                    }
+                );
+            }
+
+            if (id == idUsuarioActual)
+            {
+                return BadRequest(
+                    new
+                    {
+                        status = 400,
+                        error = "Operación no permitida",
+                        message = "No puedes eliminar tu propio usuario mientras estás logueado.",
+                    }
+                );
+            }
+
             var usuario = await _context.Usuario.FindAsync(id);
             if (usuario == null)
             {
-                return NotFound();
+                return NotFound(
+                    new
+                    {
+                        status = 404,
+                        error = "No encontrado",
+                        message = "El usuario que intentas eliminar no existe.",
+                    }
+                );
             }
 
-            // Eliminación lógica: marcar el usuario como inactivo
+            if (!usuario.Activo)
+            {
+                return BadRequest(
+                    new
+                    {
+                        status = 400,
+                        error = "Operación no permitida",
+                        message = "El usuario ya está inactivo.",
+                    }
+                );
+            }
+
+            // Validar que si es admin, no sea el último activo
+            if (usuario.RolId == 1) // Asumiendo 1 = Administrador
+            {
+                var adminsActivos = _context.Usuario.Count(u =>
+                    u.RolId == 1 && u.Activo && u.Id != id
+                );
+                if (adminsActivos == 0)
+                {
+                    return BadRequest(
+                        new
+                        {
+                            status = 400,
+                            error = "Operación no permitida",
+                            message = "No se puede eliminar al último administrador activo.",
+                        }
+                    );
+                }
+            }
+
             usuario.Activo = false;
             await _context.SaveChangesAsync();
 
-            return NoContent();
+            return Ok(
+                new
+                {
+                    status = 200,
+                    message = "El usuario ha sido marcado como inactivo correctamente.",
+                    usuario = new
+                    {
+                        usuario.Id,
+                        usuario.Nombre,
+                        usuario.Email,
+                        usuario.RolId,
+                        usuario.Activo,
+                    },
+                }
+            );
         }
 
         // PATCH: api/usuarios/{id}/estado
         [HttpPatch("{id}/estado")]
+        [Authorize(Roles = "Administrador")]
         public async Task<IActionResult> CambiarEstadoUsuario(
             int id,
             [FromBody] CambiarEstadoDto dto
         )
         {
+            if (dto == null)
+            {
+                return BadRequest(new { status = 400, message = "Datos inválidos." });
+            }
+
             var usuario = await _context.Usuario.FindAsync(id);
             if (usuario == null)
             {
                 return NotFound(new { status = 404, message = "El usuario no existe." });
             }
 
+            var idUsuarioActual = User.GetUserId();
+            if (idUsuarioActual == null)
+            {
+                return Unauthorized(
+                    new
+                    {
+                        status = 401,
+                        message = "No se pudo determinar la identidad del usuario actual.",
+                    }
+                );
+            }
+
+            if (id == idUsuarioActual && dto.Activo == false)
+            {
+                return BadRequest(
+                    new { status = 400, message = "No puedes desactivar tu propio usuario." }
+                );
+            }
+
+            if (usuario.Activo == dto.Activo)
+            {
+                return BadRequest(
+                    new { status = 400, message = "El estado del usuario ya es el solicitado." }
+                );
+            }
+
+            if (usuario.RolId == 1 && dto.Activo == false) // Asumiendo 1 = Administrador
+            {
+                var adminsActivos = _context.Usuario.Count(u =>
+                    u.RolId == 1 && u.Activo && u.Id != id
+                );
+                if (adminsActivos == 0)
+                {
+                    return BadRequest(
+                        new
+                        {
+                            status = 400,
+                            message = "No se puede desactivar al último administrador activo.",
+                        }
+                    );
+                }
+            }
+
             usuario.Activo = dto.Activo;
             usuario.FechaModificacion = DateTime.UtcNow;
-            usuario.IdUsuarioModifica = int.Parse(
-                User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0"
-            );
+            usuario.IdUsuarioModifica = idUsuarioActual.Value;
 
             await _context.SaveChangesAsync();
 
@@ -560,6 +747,237 @@ namespace backend.Controllers
                     },
                 }
             );
+        }
+
+        // Endpoint para obtener el perfil del usuario autenticado
+
+        // GET: api/usuarios/perfil
+        [HttpGet("perfil")]
+        [Authorize(Roles = "Administrador,Barbero")]
+        public IActionResult GetPerfil()
+        {
+            var userId = User.GetUserId();
+            if (userId == null)
+            {
+                return Unauthorized(new { status = 401, message = "Usuario no autenticado." });
+            }
+
+            var usuario = _context
+                .Usuario.Include(u => u.Rol)
+                .FirstOrDefault(u => u.Id == userId.Value);
+
+            if (usuario == null)
+            {
+                return NotFound(new { status = 404, message = "Usuario no encontrado." });
+            }
+
+            var perfilDto = new UsuarioPerfilDto
+            {
+                Id = usuario.Id,
+                Nombre = usuario.Nombre!,
+                Email = usuario.Email!,
+                Telefono = usuario.Telefono,
+                RolNombre = usuario.Rol!.NombreRol,
+                AccedeAlSistema = usuario.AccedeAlSistema,
+                Activo = usuario.Activo,
+                FechaRegistro = usuario.FechaRegistro,
+                Avatar = !string.IsNullOrEmpty(usuario.Avatar)
+                    ? usuario.Avatar
+                    : "/avatars/no_avatar.jpg",
+            };
+
+            return Ok(
+                new
+                {
+                    status = 200,
+                    message = "Perfil obtenido correctamente.",
+                    usuario = perfilDto,
+                }
+            );
+        }
+
+        // PUT: api/usuarios/perfil
+        [HttpPut("perfil")]
+        [Authorize(Roles = "Administrador,Barbero")]
+        public IActionResult UpdatePerfil()
+        {
+            try
+            {
+                var userId = User.GetUserId();
+                if (userId == null)
+                {
+                    return Unauthorized(new { status = 401, message = "Usuario no autenticado." });
+                }
+
+                var form = Request.Form;
+
+                var nombre = form["Nombre"].ToString();
+                var email = form["Email"].ToString();
+                var telefono = form["Telefono"].ToString();
+                var password = form["Password"].ToString();
+                var eliminarAvatar = form["EliminarAvatar"].ToString().ToLower() == "true";
+
+                var usuario = _context
+                    .Usuario.Include(u => u.Rol)
+                    .FirstOrDefault(u => u.Id == userId.Value);
+
+                if (usuario == null)
+                {
+                    return NotFound(new { status = 404, message = "Usuario no encontrado." });
+                }
+
+                // Validación de email duplicado
+                var nuevoEmail = !string.IsNullOrEmpty(email) ? email.Trim().ToLower() : null;
+                var emailActual = usuario.Email?.Trim().ToLower();
+
+                if (nuevoEmail != emailActual)
+                {
+                    bool emailExistente = _context.Usuario.Any(u =>
+                        u.Email != null && u.Email.ToLower() == nuevoEmail && u.Id != userId.Value
+                    );
+
+                    if (emailExistente)
+                    {
+                        return BadRequest(
+                            new
+                            {
+                                status = 400,
+                                message = "El email ya está en uso por otro usuario.",
+                            }
+                        );
+                    }
+                }
+
+                // Actualizar datos del perfil
+                usuario.Nombre = nombre;
+                usuario.Email = email;
+                usuario.Telefono = telefono;
+                usuario.FechaModificacion = DateTime.UtcNow;
+                usuario.IdUsuarioModifica = userId.Value;
+
+                // Cambiar contraseña si se envía
+                if (!string.IsNullOrWhiteSpace(password))
+                {
+                    usuario.PasswordHash = BCrypt.Net.BCrypt.HashPassword(password);
+                }
+
+                // Función local para eliminar avatar
+                void EliminarArchivoAvatar(string avatarRuta)
+                {
+                    var oldFilePath = Path.Combine(
+                        Directory.GetCurrentDirectory(),
+                        "wwwroot",
+                        avatarRuta.TrimStart('/')
+                    );
+
+                    if (System.IO.File.Exists(oldFilePath))
+                    {
+                        GC.Collect();
+                        GC.WaitForPendingFinalizers();
+
+                        var fileInfo = new FileInfo(oldFilePath);
+                        fileInfo.Attributes = FileAttributes.Normal;
+                        System.IO.File.Delete(oldFilePath);
+
+                        var oldUserFolder = Path.GetDirectoryName(oldFilePath);
+                        if (
+                            Directory.Exists(oldUserFolder)
+                            && !Directory.EnumerateFileSystemEntries(oldUserFolder).Any()
+                        )
+                        {
+                            var dirInfo = new DirectoryInfo(oldUserFolder);
+                            dirInfo.Attributes = FileAttributes.Normal;
+                            Directory.Delete(oldUserFolder);
+                        }
+                    }
+                }
+
+                // Eliminar avatar si se solicita
+                if (eliminarAvatar && !string.IsNullOrEmpty(usuario.Avatar))
+                {
+                    EliminarArchivoAvatar(usuario.Avatar);
+                    usuario.Avatar = null;
+                }
+
+                // Subir nuevo avatar si hay archivo
+                var avatarFile = Request.Form.Files.FirstOrDefault();
+
+                if (avatarFile != null && avatarFile.Length > 0)
+                {
+                    // Si NO eliminamos el avatar y ya existe, eliminar el anterior para reemplazarlo
+                    if (!eliminarAvatar && !string.IsNullOrEmpty(usuario.Avatar))
+                    {
+                        EliminarArchivoAvatar(usuario.Avatar);
+                    }
+
+                    var uploadsFolder = Path.Combine(
+                        Directory.GetCurrentDirectory(),
+                        "wwwroot",
+                        "avatars"
+                    );
+                    var userFolderPath = Path.Combine(uploadsFolder, userId.Value.ToString());
+
+                    if (!Directory.Exists(userFolderPath))
+                    {
+                        Directory.CreateDirectory(userFolderPath);
+                    }
+
+                    var fileName = $"avatar_{userId}_{Guid.NewGuid()}.jpg";
+                    var filePath = Path.Combine(userFolderPath, fileName);
+
+                    using (var image = Image.Load(avatarFile.OpenReadStream()))
+                    {
+                        var size = new Size(240, 240);
+                        var resizeOptions = new ResizeOptions
+                        {
+                            Size = size,
+                            Mode = ResizeMode.Crop, // Mantiene proporción y recorta centrado
+                            Position = AnchorPositionMode.Center,
+                        };
+
+                        image.Mutate(x => x.Resize(resizeOptions));
+
+                        var encoder = new JpegEncoder { Quality = 90 };
+                        using (var outputStream = new FileStream(filePath, FileMode.Create))
+                        {
+                            image.Save(outputStream, encoder);
+                        }
+                    }
+
+                    usuario.Avatar = $"/avatars/{userId}/{fileName}";
+                }
+
+                _context.SaveChanges();
+
+                return Ok(
+                    new
+                    {
+                        status = 200,
+                        message = "Perfil actualizado correctamente.",
+                        usuario = new UsuarioPerfilDto
+                        {
+                            Id = usuario.Id,
+                            Nombre = usuario.Nombre!,
+                            Email = usuario.Email!,
+                            Telefono = usuario.Telefono,
+                            RolNombre = usuario.Rol!.NombreRol,
+                            AccedeAlSistema = usuario.AccedeAlSistema,
+                            Activo = usuario.Activo,
+                            FechaRegistro = usuario.FechaRegistro,
+                            Avatar = !string.IsNullOrEmpty(usuario.Avatar)
+                                ? usuario.Avatar
+                                : "/avatars/no_avatar.jpg",
+                        },
+                    }
+                );
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(
+                    500,
+                    new { status = 500, message = "Error interno: " + ex.Message }
+                );
+            }
         }
     }
 }

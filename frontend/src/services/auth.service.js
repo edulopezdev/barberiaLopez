@@ -1,10 +1,11 @@
 const KEY_TOKEN = "token";
 const KEY_USER = "user";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export default {
   login(email, password) {
     // Llamada a la API .NET
-    const url = "http://localhost:5042/api/auth/login";
+    const url = `${API_BASE_URL}/api/auth/login`;
     axios
       .post(url, { email, password })
       .then((res) => {

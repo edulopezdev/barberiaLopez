@@ -13,17 +13,27 @@ export default {
   },
   methods: {
     mostrarToast({ icon = "info", title = "", timer = 3000 }) {
-      Swal.fire({
-        toast: true,
-        position: "top-end",
-        showConfirmButton: false,
-        timer,
-        timerProgressBar: true,
-        icon,
-        title,
-        background: "#fefefe",
-      });
-    },
+  const iconColors = {
+    success: "#28a745",
+    error: "#dc3545",
+    warning: "#ffc107",
+    info: "#17a2b8",
+  };
+
+  Swal.fire({
+    toast: true,
+    position: "top-end",
+    showConfirmButton: false,
+    timer,
+    timerProgressBar: true,
+    icon,
+    title,
+    background: "#18181b",
+    color: "#ffffff",
+    iconColor: iconColors[icon] || "#ffffff",
+  });
+},
+
 
     iniciarSesion() {
       if (!this.usuario.email || !this.usuario.password) {

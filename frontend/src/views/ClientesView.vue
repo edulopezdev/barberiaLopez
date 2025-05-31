@@ -136,6 +136,11 @@
             </template>
           </Column>
         </DataTable>
+
+        <!-- Mensaje de cantidad total -->
+        <div class="total-clientes" v-if="totalClients > 0">
+          Total de clientes registrados: {{ totalClients }}
+        </div>
       </template>
     </Card>
 
@@ -274,7 +279,7 @@ export default {
 
         if (result.isConfirmed) {
           try {
-            await UsuarioService.actualizarCliente(
+            await UsuarioService.actualizarUsuario(
               clienteActualizado.id,
               clienteActualizado
             );
@@ -289,9 +294,9 @@ export default {
               color: "#fff",
             });
             this.obtenerClientes();
+            this.verDetalles(clienteActualizado);
           } catch (error) {
             console.error("Error completo:", error);
-            console.error("Error response:", error.response);
             const mensaje =
               error?.response?.data?.message ||
               "No se pudo actualizar el cliente.";
@@ -313,35 +318,51 @@ export default {
       } else {
         this.cerrarModal();
 
-        try {
-          await UsuarioService.crearCliente(clienteActualizado);
-          await Swal.fire({
-            title: "Creado",
-            text: "Cliente creado correctamente.",
-            icon: "success",
-            timer: 2000,
-            timerProgressBar: true,
-            showConfirmButton: false,
-            background: "#18181b",
-            color: "#fff",
-          });
-          this.obtenerClientes();
-        } catch (error) {
-          console.error(error);
+        const result = await Swal.fire({
+          title: `¿Crear cliente ${clienteActualizado.nombre}?`,
+          icon: "question",
+          showCancelButton: true,
+          confirmButtonColor: "#3085d6",
+          cancelButtonColor: "#6c757d",
+          confirmButtonText: "Sí, crear",
+          cancelButtonText: "Cancelar",
+          background: "#18181b",
+          color: "#fff",
+        });
 
-          const mensaje =
-            error?.response?.data?.message || "No se pudo crear el cliente.";
+        if (result.isConfirmed) {
+          try {
+            await UsuarioService.crearCliente(clienteActualizado);
+            await Swal.fire({
+              title: "Creado",
+              text: "Cliente creado correctamente.",
+              icon: "success",
+              timer: 2000,
+              timerProgressBar: true,
+              showConfirmButton: false,
+              background: "#18181b",
+              color: "#fff",
+            });
+            this.obtenerClientes();
+          } catch (error) {
+            console.error(error);
 
-          await Swal.fire({
-            title: "Error",
-            text: mensaje,
-            icon: "error",
-            background: "#18181b",
-            color: "#fff",
-          });
+            const mensaje =
+              error?.response?.data?.message || "No se pudo crear el cliente.";
 
-          // Reabrir el modal y conservar los datos
-          this.abrirModalNuevo({ ...clienteActualizado }); // <-- copia segura
+            await Swal.fire({
+              title: "Error",
+              text: mensaje,
+              icon: "error",
+              background: "#18181b",
+              color: "#fff",
+            });
+
+            // Reabrir el modal y conservar los datos
+            this.abrirModalNuevo({ ...clienteActualizado });
+          }
+        } else {
+          this.abrirModalNuevo(clienteActualizado);
         }
       }
     },
@@ -820,5 +841,12 @@ export default {
 .icono-filtro:hover {
   transform: scale(1.2);
   color: #28a745;
+}
+.total-clientes {
+  margin-top: 1.9rem;
+  font-size: 1rem;
+  font-weight: 500;
+  text-align: left;
+  color: #aeaeae;
 }
 </style>
