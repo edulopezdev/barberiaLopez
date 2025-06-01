@@ -1,6 +1,6 @@
 <template>
-  <div class="formulario-cliente usuario-form">
-    <h3>Editar Perfil</h3>
+  <div class="formulario-producto">
+    <h3>{{ form.id ? "Editar Producto" : "Nuevo Producto" }}</h3>
 
     <!-- Nombre -->
     <div class="campo" :class="{ error: errores.nombre }">
@@ -11,55 +11,53 @@
       </div>
     </div>
 
-    <!-- Email -->
-    <div class="campo" :class="{ error: errores.email }">
-      <label for="email">Email <span class="obligatorio">*</span></label>
-      <InputText id="email" v-model="form.email" type="email" />
-      <div v-if="errores.email" class="error-msg">
-        <i class="pi pi-exclamation-triangle"></i> {{ errores.email }}
+    <!-- Descripción -->
+    <div class="campo" :class="{ error: errores.descripcion }">
+      <label for="descripcion">Descripción</label>
+      <Textarea id="descripcion" v-model="form.descripcion" rows="3" />
+      <div v-if="errores.descripcion" class="error-msg">
+        <i class="pi pi-exclamation-triangle"></i> {{ errores.descripcion }}
       </div>
     </div>
 
-    <!-- Teléfono -->
-    <div class="campo" :class="{ error: errores.telefono }">
-      <label for="telefono">Teléfono <span class="obligatorio">*</span></label>
-      <InputText
-        id="telefono"
-        v-model="form.telefono"
-        @keypress="soloNumeros"
-        @input="form.telefono = form.telefono.replace(/\D/g, '')"
-        placeholder="Solo números"
-      />
-      <div v-if="errores.telefono" class="error-msg">
-        <i class="pi pi-exclamation-triangle"></i> {{ errores.telefono }}
+    <!-- Precio -->
+    <div class="campo" :class="{ error: errores.precio }">
+      <label for="precio">Precio <span class="obligatorio">*</span></label>
+      <InputNumber id="precio" v-model="form.precio" mode="currency" currency="USD" locale="en-US" />
+      <div v-if="errores.precio" class="error-msg">
+        <i class="pi pi-exclamation-triangle"></i> {{ errores.precio }}
       </div>
     </div>
 
-    <!-- Rol actual (solo lectura) -->
-    <div class="campo">
-      <label for="rolActual">Rol Actual</label>
-      <InputText
-        id="rolActual"
-        :value="form.rolNombre"
-        readonly
-        style="background-color: #2d2d2d; color: #ffffff"
-      />
+    <!-- Es Almacenable (solo visible si se llama desde ambas vistas) -->
+    <div class="campo" v-if="almacenablePorDefecto === null">
+      <label for="almacenable">Es almacenable</label>
+      <Checkbox id="almacenable" v-model="form.esAlmacenable" :binary="true" />
     </div>
 
-    <!-- Avatar -->
+    <!-- Cantidad (solo visible si es almacenable) -->
+    <div class="campo" v-if="form.esAlmacenable" :class="{ error: errores.cantidad }">
+      <label for="cantidad">Cantidad</label>
+      <InputNumber id="cantidad" v-model="form.cantidad" />
+      <div v-if="errores.cantidad" class="error-msg">
+        <i class="pi pi-exclamation-triangle"></i> {{ errores.cantidad }}
+      </div>
+    </div>
+
+    <!-- Imagen -->
     <div class="campo">
-      <label>Avatar</label>
+      <label>Imagen</label>
       <div class="avatar-preview">
-        <img :src="avatarUrl" alt="Avatar" />
+        <img :src="imagenUrl" alt="Imagen del producto" />
       </div>
       <div class="avatar-actions">
         <FileUpload
           mode="basic"
-          name="avatar"
+          name="imagen"
           accept="image/*"
           chooseLabel=""
           chooseIcon="pi pi-pencil"
-          @select="onAvatarSeleccionado"
+          @select="onImagenSeleccionada"
           :auto="true"
           customUpload
           class="boton-avatar fileupload-icon"
@@ -67,28 +65,9 @@
         <Button
           icon="pi pi-trash"
           class="boton-avatar boton-avatar-eliminar"
-          @click="eliminarAvatar"
-          v-if="form.avatar || previewAvatar"
+          @click="eliminarImagen"
+          v-if="form.imagen || previewImagen"
         />
-      </div>
-    </div>
-
-    <!-- Contraseña -->
-    <div class="campo" :class="{ error: errores.password }">
-      <label for="password">
-        Nueva Contraseña
-        <small style="font-weight: normal; font-size: 0.8rem; color: #666">
-          (Dejar vacío para no cambiar)
-        </small>
-      </label>
-      <InputText
-        id="password"
-        v-model="form.password"
-        type="password"
-        autocomplete="new-password"
-      />
-      <div v-if="errores.password" class="error-msg">
-        <i class="pi pi-exclamation-triangle"></i> {{ errores.password }}
       </div>
     </div>
 
@@ -97,7 +76,7 @@
       <div class="contenedor-boton">
         <Button
           class="btn-guardar"
-          label="Guardar"
+          :label="form.id ? 'Actualizar' : 'Guardar'"
           icon="pi pi-check"
           @click="onGuardar"
         />
@@ -111,115 +90,104 @@
 
 <script>
 import InputText from "primevue/inputtext";
+import Textarea from "primevue/textarea";
+import InputNumber from "primevue/inputnumber";
+import Checkbox from "primevue/checkbox";
 import Button from "primevue/button";
 import FileUpload from "primevue/fileupload";
 
 export default {
-  name: "PerfilForm",
-  components: { InputText, Button, FileUpload },
+  name: "ProductoServicioForm",
+  components: { InputText, Textarea, InputNumber, Checkbox, Button, FileUpload },
   props: {
-    usuario: Object,
+    productoServicio: Object,
+    almacenablePorDefecto: {
+      type: Boolean,
+      default: null // null = editable, true/false = fijo
+    }
   },
   data() {
     return {
       form: {
         id: null,
         nombre: "",
-        email: "",
-        telefono: "",
-        rolNombre: "",
-        avatar: "",
-        password: "",
-        nuevoAvatar: null,
-        eliminarAvatarFlag: false,
+        descripcion: "",
+        precio: 0.0,
+        esAlmacenable: this.almacenablePorDefecto ?? false,
+        cantidad: 0,
+        imagen: "",
+        nuevoArchivo: null,
+        eliminarImagenFlag: false
       },
-      previewAvatar: null,
+      previewImagen: null,
       errores: {
         nombre: null,
-        email: null,
-        telefono: null,
-        password: null,
-      },
+        descripcion: null,
+        precio: null,
+        cantidad: null
+      }
     };
   },
   mounted() {
-    if (this.usuario) {
+    if (this.productoServicio) {
       this.form = {
-        id: this.usuario.id,
-        nombre: this.usuario.nombre || "",
-        email: this.usuario.email || "",
-        telefono: this.usuario.telefono || "",
-        rolNombre:
-          this.usuario.rolNombre || this.usuario.rol?.nombre || "No definido",
-        avatar: this.usuario.avatar || "",
-        password: "",
+        id: this.productoServicio.id,
+        nombre: this.productoServicio.nombre || "",
+        descripcion: this.productoServicio.descripcion || "",
+        precio: this.productoServicio.precio || 0.0,
+        esAlmacenable: this.productoServicio.esAlmacenable ?? false,
+        cantidad: this.productoServicio.cantidad ?? 0,
+        imagen: this.productoServicio.rutaImagen || "",
+        nuevoArchivo: null,
+        eliminarImagenFlag: false
       };
+    } else {
+      // Si no hay datos, usamos el valor por defecto
+      this.form.esAlmacenable = this.almacenablePorDefecto ?? false;
     }
   },
   methods: {
-    soloNumeros(event) {
-      const charCode = event.charCode ? event.charCode : event.keyCode;
-      if (charCode < 48 || charCode > 57) {
-        event.preventDefault();
-      }
-    },
-    onAvatarSeleccionado(event) {
+    onImagenSeleccionada(event) {
       const file = event.files[0];
       if (file) {
-        this.form.nuevoAvatar = file;
-        this.previewAvatar = URL.createObjectURL(file);
+        this.form.nuevoArchivo = file;
+        this.previewImagen = URL.createObjectURL(file);
       }
     },
-    eliminarAvatar() {
-      this.form.avatar = null;
-      this.form.nuevoAvatar = null;
-      this.previewAvatar = null;
-      this.eliminarAvatarFlag = true;
+    eliminarImagen() {
+      this.form.imagen = null;
+      this.form.nuevoArchivo = null;
+      this.previewImagen = null;
+      this.form.eliminarImagenFlag = true;
     },
     validarFormulario() {
       this.errores = {
         nombre: null,
-        email: null,
-        telefono: null,
-        password: null,
+        descripcion: null,
+        precio: null,
+        cantidad: null
       };
+
       let valido = true;
-      const camposConError = [];
 
       if (!this.form.nombre.trim()) {
         this.errores.nombre = "El nombre es obligatorio.";
-        camposConError.push("nombre");
         valido = false;
       }
 
-      if (!this.form.email.trim()) {
-        this.errores.email = "El email es obligatorio.";
-        camposConError.push("email");
-        valido = false;
-      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.form.email)) {
-        this.errores.email = "El email no es válido.";
-        camposConError.push("email");
+      if (this.form.precio <= 0) {
+        this.errores.precio = "El precio debe ser mayor a cero.";
         valido = false;
       }
 
-      if (!this.form.telefono.trim()) {
-        this.errores.telefono = "El teléfono es obligatorio.";
-        camposConError.push("telefono");
-        valido = false;
-      } else if (/\D/.test(this.form.telefono)) {
-        this.errores.telefono = "El teléfono debe contener solo números.";
-        camposConError.push("telefono");
+      if (this.form.esAlmacenable && this.form.cantidad < 0) {
+        this.errores.cantidad = "La cantidad no puede ser negativa.";
         valido = false;
       }
 
-      if (camposConError.length > 0) {
-        this.$nextTick(() => {
-          const campo = document.getElementById(camposConError[0]);
-          if (campo) {
-            campo.scrollIntoView({ behavior: "smooth", block: "center" });
-            campo.focus();
-          }
-        });
+      if (!this.form.esAlmacenable && this.form.cantidad > 0) {
+        this.errores.cantidad = "Un servicio no puede tener cantidad.";
+        valido = false;
       }
 
       return valido;
@@ -228,35 +196,39 @@ export default {
       if (!this.validarFormulario()) return;
 
       const formData = new FormData();
+
       formData.append("Nombre", this.form.nombre);
-      formData.append("Email", this.form.email);
-      formData.append("Telefono", this.form.telefono);
-      if (this.form.password) {
-        formData.append("Password", this.form.password);
+      formData.append("Descripcion", this.form.descripcion || "");
+      formData.append("Precio", this.form.precio);
+      formData.append("EsAlmacenable", this.form.esAlmacenable);
+
+      if (this.form.esAlmacenable) {
+        formData.append("Cantidad", this.form.cantidad);
       }
-      if (this.form.nuevoAvatar) {
-        formData.append("Avatar", this.form.nuevoAvatar);
+
+      if (this.form.nuevoArchivo) {
+        formData.append("Imagen", this.form.nuevoArchivo);
       }
-      if (this.eliminarAvatarFlag) {
-        formData.append("EliminarAvatar", "true");
+
+      if (this.form.eliminarImagenFlag) {
+        formData.append("EliminarImagen", "true");
       }
 
       this.$emit("guardar", formData);
-    },
+    }
   },
   computed: {
-    avatarUrl() {
-      if (this.previewAvatar) return this.previewAvatar;
-      if (this.form.avatar) {
-        const baseUrl =
-          import.meta.env.VITE_API_BASE_URL || "http://localhost:5042";
-        return this.form.avatar.startsWith("http")
-          ? this.form.avatar
-          : `${baseUrl}${this.form.avatar}`;
+    imagenUrl() {
+      if (this.previewImagen) return this.previewImagen;
+      if (this.form.imagen) {
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:5042";
+        return this.form.imagen.startsWith("http")
+          ? this.form.imagen
+          : `${baseUrl}${this.form.imagen}`;
       }
-      return "/img/avatar-placeholder.png";
-    },
-  },
+      return "/img/no-image.png"; // placeholder por defecto
+    }
+  }
 };
 </script>
 

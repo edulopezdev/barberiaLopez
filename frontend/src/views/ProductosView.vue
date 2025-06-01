@@ -1,10 +1,10 @@
 <template>
-  <div class="usuarios-container">
+  <div class="productos-container">
     <Toast />
     <Card>
       <template #title>
         <div class="encabezado-acciones">
-          <h4>Usuarios del Sistema</h4>
+          <h4>Productos</h4>
           <div class="botones-acciones">
             <Button
               label="Filtros"
@@ -13,9 +13,9 @@
               @click="mostrarFiltros = !mostrarFiltros"
             />
             <Button
-              label="Nuevo Usuario"
+              label="Nuevo Producto"
               icon="pi pi-plus"
-              class="boton-nuevo-usuario"
+              class="boton-nuevo-producto"
               @click="abrirModalNuevo()"
             />
           </div>
@@ -25,21 +25,23 @@
       <template #content>
         <DataTable
           v-model:filters="filters"
-          :value="usuarios"
+          :value="productos"
           :filterDisplay="mostrarFiltros ? 'row' : 'none'"
-          :globalFilterFields="['nombre', 'email', 'telefono', 'rolNombre']"
           lazy
           paginator
           :rows="pageSize"
-          :first="first"
-          :totalRecords="totalUsuarios"
+          :totalRecords="totalProductos"
           tableStyle="min-width: 100%"
           :loading="loading"
           @page="onPageChange"
           @sort="onSort"
           @filter="onFilter"
+          :customSort="true"
+          sortMode="single"
+          :autoLayout="true"
         >
-          <Column field="nombre" sortable>
+          <!-- Nombre -->
+          <Column field="nombre" header="Nombre" sortable>
             <template #header>
               <span class="titulo-columna">Nombre</span>
             </template>
@@ -52,43 +54,47 @@
             </template>
           </Column>
 
-          <Column field="email" header="Email" sortable>
+          <!-- Descripción -->
+          <Column field="descripcion" header="Descripción" sortable>
             <template #filter="{ filterModel, filterCallback }">
               <InputText
                 v-model="filterModel.value"
                 @input="filterCallback()"
-                placeholder="Buscar por email"
+                placeholder="Buscar por descripción"
               />
             </template>
           </Column>
 
-          <Column field="telefono" header="Teléfono" sortable>
-            <template #filter="{ filterModel, filterCallback }">
-              <InputText
-                v-model="filterModel.value"
-                @input="filterCallback()"
-                placeholder="Buscar por teléfono"
-              />
-            </template>
-          </Column>
-
-          <Column field="rolNombre" header="Rol" sortable>
-            <template #filter="{ filterModel, filterCallback }">
-              <Dropdown
-                v-model="filterModel.value"
-                @change="filterCallback()"
-                :options="rolesDropdown"
-                optionLabel="label"
-                optionValue="value"
-                placeholder="Seleccionar rol"
-                showClear
-              />
-            </template>
+          <!-- Precio -->
+          <Column field="precio" header="Precio" sortable>
             <template #body="slotProps">
-              {{ slotProps.data.rolNombre }}
+              {{ formatPrecio(slotProps.data.precio) }}
+            </template>
+            <template #filter="{ filterModel, filterCallback }">
+              <InputText
+                v-model="filterModel.value"
+                @input="filterCallback()"
+                placeholder="Buscar por precio"
+              />
             </template>
           </Column>
 
+          <!-- Cantidad -->
+          <Column field="cantidad" header="Cantidad" sortable>
+            <template #body="slotProps">
+              {{ slotProps.data.cantidad }}
+            </template>
+            <template #filter="{ filterModel, filterCallback }">
+              <InputText
+                v-model="filterModel.value"
+                @input="filterCallback()"
+                placeholder="Buscar por cantidad"
+              />
+            </template>
+          </Column>
+
+          <!-- Estado (de momento no lo usaremos) -->
+          <!--
           <Column field="activo" header="Estado">
             <template #body="slotProps">
               <Tag
@@ -110,7 +116,27 @@
               />
             </template>
           </Column>
+        -->
 
+          <!-- Imagen -->
+          <Column field="imagen" header="Imagen" style="min-width: 100px">
+            ...
+            <template #filter="{ filterModel, filterCallback }">
+              <Dropdown
+                v-model="filterModel.value"
+                :options="[
+                  { label: 'Todos', value: null },
+                  { label: 'Con imagen', value: 'con' },
+                  { label: 'Sin imagen', value: 'sin' },
+                ]"
+                @change="filterCallback()"
+                placeholder="Filtrar imagen"
+                showClear
+              />
+            </template>
+          </Column>
+
+          <!-- Acciones -->
           <Column header="Acciones" style="min-width: 180px">
             <template #body="slotProps">
               <div class="acciones-botones">
@@ -127,68 +153,55 @@
                   severity="warning"
                   text
                   rounded
-                  v-tooltip.bottom="'Editar usuario'"
+                  v-tooltip.bottom="'Editar producto'"
                   @click="abrirModalEditar(slotProps.data)"
                 />
                 <Button
-                  v-if="
-                    usuarioLogueadoId !== null &&
-                    (slotProps.data.id !== usuarioLogueadoId ||
-                      !slotProps.data.activo)
-                  "
-                  :icon="
-                    slotProps.data.activo ? 'pi pi-trash' : 'pi pi-refresh'
-                  "
-                  :severity="slotProps.data.activo ? 'danger' : 'success'"
+                  icon="pi pi-trash"
+                  severity="danger"
                   text
                   rounded
-                  :v-tooltip.bottom="
-                    slotProps.data.activo
-                      ? 'Eliminar usuario'
-                      : 'Reactivar usuario'
-                  "
-                  @click="
-                    slotProps.data.activo
-                      ? eliminarUsuario(slotProps.data)
-                      : reactivarUsuario(slotProps.data)
-                  "
+                  v-tooltip.bottom="'Eliminar producto'"
+                  @click="eliminarProducto(slotProps.data)"
                 />
               </div>
             </template>
           </Column>
         </DataTable>
 
-        <div class="total-usuarios" v-if="totalUsuarios > 0">
-          Total de usuarios registrados: {{ totalUsuarios }}
+        <div class="total-productos" v-if="totalProductos > 0">
+          Total de productos registrados: {{ totalProductos }}
         </div>
       </template>
     </Card>
 
+    <!-- Modal Nuevo/Editar -->
     <Dialog
       v-model:visible="mostrarModal"
-      :header="usuarioSeleccionado?.id ? 'Editar Usuario' : 'Nuevo Usuario'"
+      :header="productoSeleccionado?.id ? 'Editar Producto' : 'Nuevo Producto'"
       :modal="true"
       :closeOnEscape="false"
-      :closeOnBackdropClick="false"
       :closable="false"
       style="width: 450px"
     >
-      <UsuarioForm
-        :usuario="usuarioSeleccionado"
-        @guardar="guardarUsuario"
+      <ProductoServicioForm
+        :productoServicio="productoSeleccionado"
+        almacenablePorDefecto="true"
+        @guardar="guardarProducto"
         @cancelar="cerrarModal"
       />
     </Dialog>
 
+    <!-- Detalle (opcional por ahora) -->
     <Dialog
       v-model:visible="mostrarDetalleModal"
-      header="Detalle del Usuario"
+      header="Detalle del Producto"
       :modal="true"
       :closable="false"
       style="width: 450px"
     >
-      <UsuarioDetalle
-        :usuario="usuarioSeleccionado"
+      <ProductoServicioDetalle
+        :producto="productoSeleccionado"
         @cerrar="mostrarDetalleModal = false"
       />
     </Dialog>
@@ -196,7 +209,6 @@
 </template>
 
 <script>
-import UsuarioService from "../services/UsuarioService";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Card from "primevue/card";
@@ -204,14 +216,19 @@ import Tag from "primevue/tag";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import Dropdown from "primevue/dropdown";
-import { FilterMatchMode } from "primevue/api";
 import Dialog from "primevue/dialog";
-import UsuarioForm from "../components/UsuarioForm.vue";
-import UsuarioDetalle from "../components/UsuarioDetalle.vue";
+import { FilterMatchMode } from "primevue/api";
 import Swal from "sweetalert2";
-import authService from "../services/auth.service";
+
+// Componentes propios
+import ProductoServicioForm from "../components/ProductoServicioForm.vue";
+import ProductoServicioDetalle from "../components/ProductoServicioDetalle.vue";
+
+// Servicio
+import productoServicioService from "../services/ProductoServicioService";
 
 export default {
+  name: "Productos",
   components: {
     DataTable,
     Column,
@@ -221,50 +238,59 @@ export default {
     InputText,
     Dropdown,
     Dialog,
-    UsuarioForm,
-    UsuarioDetalle,
+    ProductoServicioForm,
+    ProductoServicioDetalle,
   },
   data() {
     return {
-      usuarioLogueadoId: authService.getUser()?.id || null,
-      mostrarFiltros: false,
-      usuarios: [],
-      totalUsuarios: 0,
+      productos: [],
+      totalProductos: 0,
       currentPage: 1,
       pageSize: 10,
       first: 0,
       sortField: null,
       sortOrder: null,
       loading: false,
+      mostrarFiltros: false,
+
+      // Filtros
       filters: {
-        nombre: { value: null, matchMode: FilterMatchMode.STARTS_WITH },
-        email: { value: null, matchMode: FilterMatchMode.CONTAINS },
-        telefono: { value: null, matchMode: FilterMatchMode.CONTAINS },
-        rolNombre: { value: null, matchMode: FilterMatchMode.EQUALS },
-        activo: { value: true, matchMode: FilterMatchMode.EQUALS },
+        nombre: { value: null, matchMode: FilterMatchMode.CONTAINS },
+        descripcion: { value: null, matchMode: FilterMatchMode.CONTAINS },
+        precio: { value: null, matchMode: FilterMatchMode.EQUALS },
+        cantidad: { value: null, matchMode: FilterMatchMode.EQUALS },
+        imagen: { value: null, matchMode: FilterMatchMode.EQUALS }, 
       },
 
-      rolesDropdown: [
-        { label: "Administrador", value: "Administrador" },
-        { label: "Barbero", value: "Barbero" },
-      ],
-
+      // Modales
       mostrarModal: false,
-      usuarioSeleccionado: null,
+      productoSeleccionado: null,
       mostrarDetalleModal: false,
     };
   },
   mounted() {
-    this.obtenerUsuarios();
+    this.obtenerProductos();
   },
   methods: {
-    abrirModalNuevo(usuario = null) {
-      this.usuarioSeleccionado = usuario;
+    formatPrecio(precio) {
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+      }).format(precio);
+    },
+    getRutaImagen(ruta) {
+      if (!ruta) return "/img/no-image.png";
+      const baseUrl =
+        import.meta.env.VITE_API_BASE_URL || "http://localhost:5042";
+      return ruta.startsWith("http") ? ruta : `${baseUrl}${ruta}`;
+    },
+    abrirModalNuevo() {
+      this.productoSeleccionado = null;
       this.mostrarModal = true;
       document.body.classList.add("modal-open");
     },
-    abrirModalEditar(usuario) {
-      this.usuarioSeleccionado = { ...usuario };
+    abrirModalEditar(producto) {
+      this.productoSeleccionado = { ...producto };
       this.mostrarModal = true;
       document.body.classList.add("modal-open");
     },
@@ -272,23 +298,13 @@ export default {
       this.mostrarModal = false;
       document.body.classList.remove("modal-open");
     },
-    verDetalles(usuario) {
-      UsuarioService.getUsuario(usuario.id)
-        .then((res) => {
-          this.usuarioSeleccionado = res.data.usuario;
-          this.mostrarDetalleModal = true;
-        })
-        .catch(() => {
-          Swal.fire(
-            "Error",
-            "No se pudo cargar el detalle del usuario.",
-            "error"
-          );
-        });
+    verDetalles(producto) {
+      this.productoSeleccionado = { ...producto };
+      this.mostrarDetalleModal = true;
     },
-    eliminarUsuario(usuario) {
+    eliminarProducto(producto) {
       Swal.fire({
-        title: `¿Eliminar a ${usuario.nombre}?`,
+        title: `¿Eliminar "${producto.nombre}"?`,
         text: "Esta acción no se puede deshacer.",
         icon: "warning",
         showCancelButton: true,
@@ -300,180 +316,81 @@ export default {
         color: "#fff",
       }).then((result) => {
         if (result.isConfirmed) {
-          UsuarioService.eliminarUsuario(usuario.id)
+          productoServicioService
+            .eliminarProducto(producto.id)
             .then(() => {
               Swal.fire({
                 title: "Eliminado",
-                text: `El usuario ${usuario.nombre} ha sido eliminado.`,
-                icon: "success",
-                timer: 2000,
-                timerProgressBar: true,
-                showConfirmButton: false,
-                background: "#18181b",
-                color: "#fff",
-              });
-              this.obtenerUsuarios(this.currentPage, this.pageSize);
-            })
-            .catch((error) => {
-              // Extraer mensaje personalizado del backend o fallback
-              const backendMessage =
-                error?.response?.data?.message ||
-                "No se pudo eliminar el usuario.";
-
-              Swal.fire({
-                title: "Error",
-                text: backendMessage,
-                icon: "error",
-                background: "#18181b",
-                color: "#fff",
-              });
-            });
-        }
-      });
-    },
-
-    reactivarUsuario(usuario) {
-      Swal.fire({
-        title: `¿Reactivar a ${usuario.nombre}?`,
-        text: "El usuario volverá a estar activo.",
-        icon: "question",
-        showCancelButton: true,
-        confirmButtonColor: "#28a745",
-        cancelButtonColor: "#6c757d",
-        confirmButtonText: "Sí, reactivar",
-        cancelButtonText: "Cancelar",
-        background: "#18181b",
-        color: "#fff",
-      }).then((result) => {
-        if (result.isConfirmed) {
-          UsuarioService.cambiarEstado(usuario.id, true)
-            .then(() => {
-              Swal.fire({
-                title: "Reactivado",
-                text: `${usuario.nombre} ha sido reactivado.`,
+                text: `${producto.nombre} eliminado correctamente.`,
                 icon: "success",
                 timer: 2000,
                 showConfirmButton: false,
                 background: "#18181b",
                 color: "#fff",
               });
-              this.obtenerUsuarios(this.currentPage, this.pageSize);
+              this.obtenerProductos();
             })
-            .catch(() => {
-              Swal.fire("Error", "No se pudo reactivar el usuario.", "error");
+            .catch((err) => {
+              console.error(err);
+              Swal.fire("Error", "No se pudo eliminar el producto.", "error");
             });
         }
       });
     },
-    async guardarUsuario(usuarioActualizado) {
-      if (usuarioActualizado.id) {
-        this.cerrarModal();
-
-        const result = await Swal.fire({
-          title: `¿Actualizar a ${usuarioActualizado.nombre}?`,
-          icon: "question",
-          showCancelButton: true,
-          confirmButtonColor: "#3085d6",
-          cancelButtonColor: "#6c757d",
-          confirmButtonText: "Sí, actualizar",
-          cancelButtonText: "Cancelar",
-          background: "#18181b",
-          color: "#fff",
-        });
-
-        if (result.isConfirmed) {
-          try {
-            await UsuarioService.actualizarUsuario(
-              usuarioActualizado.id,
-              usuarioActualizado
-            );
-            await Swal.fire({
+    guardarProducto(formData) {
+      if (this.productoSeleccionado?.id) {
+        // Actualizar
+        productoServicioService
+          .actualizarProducto(this.productoSeleccionado.id, formData)
+          .then(() => {
+            Swal.fire({
               title: "Actualizado",
-              text: `Usuario ${usuarioActualizado.nombre} actualizado correctamente.`,
+              text: "Producto actualizado correctamente.",
               icon: "success",
               timer: 2000,
-              timerProgressBar: true,
               showConfirmButton: false,
               background: "#18181b",
               color: "#fff",
             });
-            this.obtenerUsuarios();
-            this.verDetalles(usuarioActualizado);
-          } catch (error) {
-            console.error("Error completo:", error);
-            const mensaje =
-              error?.response?.data?.message ||
-              "No se pudo actualizar el usuario.";
-
-            await Swal.fire({
-              title: "Error",
-              text: mensaje,
-              icon: "error",
-              background: "#18181b",
-              color: "#fff",
-            });
-
-            this.abrirModalEditar({ ...usuarioActualizado });
-          }
-        } else {
-          this.abrirModalEditar(usuarioActualizado);
-        }
+            this.obtenerProductos();
+            this.cerrarModal();
+          })
+          .catch((err) => {
+            console.error(err);
+            Swal.fire("Error", "No se pudo actualizar el producto.", "error");
+          });
       } else {
-        this.cerrarModal();
-
-        const result = await Swal.fire({
-          title: `¿Crear usuario ${usuarioActualizado.nombre}?`,
-          icon: "question",
-          showCancelButton: true,
-          confirmButtonColor: "#3085d6",
-          cancelButtonColor: "#6c757d",
-          confirmButtonText: "Sí, crear",
-          cancelButtonText: "Cancelar",
-          background: "#18181b",
-          color: "#fff",
-        });
-
-        if (result.isConfirmed) {
-          try {
-            await UsuarioService.crearUsuario(usuarioActualizado);
-            await Swal.fire({
+        // Crear
+        productoServicioService
+          .crearProducto(formData)
+          .then(() => {
+            Swal.fire({
               title: "Creado",
-              text: "Usuario creado correctamente.",
+              text: "Producto creado correctamente.",
               icon: "success",
               timer: 2000,
-              timerProgressBar: true,
               showConfirmButton: false,
               background: "#18181b",
               color: "#fff",
             });
-            this.obtenerUsuarios();
-          } catch (error) {
-            console.error(error);
-
-            const mensaje =
-              error?.response?.data?.message || "No se pudo crear el usuario.";
-
-            await Swal.fire({
-              title: "Error",
-              text: mensaje,
-              icon: "error",
-              background: "#18181b",
-              color: "#fff",
-            });
-
-            this.abrirModalNuevo({ ...usuarioActualizado });
-          }
-        } else {
-          this.abrirModalNuevo(usuarioActualizado);
-        }
+            this.obtenerProductos();
+            this.cerrarModal();
+          })
+          .catch((err) => {
+            console.error(err);
+            Swal.fire("Error", "No se pudo crear el producto.", "error");
+          });
       }
     },
-    async obtenerUsuarios(page = 1, pageSize = 10) {
+    obtenerProductos(page = 1, pageSize = 10) {
       this.loading = true;
 
       const filtrosAplicados = {};
+
+      // Extraer filtros limpios
       Object.keys(this.filters).forEach((key) => {
         let val = this.filters[key]?.value;
+
         if (val !== null && val !== undefined && val !== "") {
           if (typeof val === "object" && val.hasOwnProperty("value")) {
             val = val.value;
@@ -482,39 +399,47 @@ export default {
         }
       });
 
-      if (this.sortField && this.sortOrder) {
-        filtrosAplicados.ordenarPor = this.sortField;
-        filtrosAplicados.ordenDescendente = this.sortOrder === -1;
+      // Agregar ordenamiento si existe
+      if (this.sortField) {
+        filtrosAplicados.sort = this.sortField;
+        filtrosAplicados.order = this.sortOrder === 1 ? "asc" : "desc";
       }
 
-      try {
-        const res = await UsuarioService.getUsuarios(
-          page,
-          pageSize,
-          filtrosAplicados
-        );
-
-        this.usuarios = res.data.usuarios;
-        this.totalUsuarios = res.data.pagination.total;
-        this.pageSize = pageSize;
-        this.currentPage = page;
-        this.first = (page - 1) * pageSize;
-      } catch (err) {
-        console.error("Error al cargar usuarios:", err);
-      } finally {
-        this.loading = false;
-      }
+      productoServicioService
+        .getProductos(page, pageSize, filtrosAplicados)
+        .then((res) => {
+          this.productos = res.data.productos;
+          this.totalProductos = res.data.pagination.totalProductos;
+          this.pageSize = pageSize;
+          this.currentPage = page;
+          this.first = (page - 1) * pageSize;
+        })
+        .catch((err) => {
+          console.error("Error al cargar productos:", err);
+          this.productos = [];
+          Swal.fire({
+            title: "Error",
+            text: "No se pudieron cargar los productos.",
+            icon: "error",
+            background: "#18181b",
+            color: "#fff",
+          });
+        })
+        .finally(() => {
+          this.loading = false;
+        });
     },
     onPageChange(event) {
-      this.obtenerUsuarios(event.page + 1, event.rows);
+      this.obtenerProductos(event.page + 1, event.rows);
     },
     onSort(event) {
       this.sortField = event.sortField;
       this.sortOrder = event.sortOrder;
-      this.obtenerUsuarios(this.currentPage, this.pageSize);
+      this.obtenerProductos(1, this.pageSize);
     },
+
     onFilter() {
-      this.obtenerUsuarios(1, this.pageSize);
+      this.obtenerProductos(1, this.pageSize);
     },
   },
 };
@@ -524,7 +449,7 @@ export default {
 /* ===========================
    CONTENEDOR GENERAL
 =========================== */
-.usuarios-container {
+.clientes-container {
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
@@ -564,7 +489,7 @@ export default {
   border-color: transparent !important;
 }
 
-.boton-nuevo-usuario {
+.boton-nuevo-producto {
   background-color: #28a745;
   color: white;
   font-weight: normal;
@@ -575,7 +500,7 @@ export default {
   height: auto !important;
   min-width: 120px !important;
 }
-.boton-nuevo-usuario:hover {
+.boton-nuevo-cliente:hover {
   background-color: #218838;
 }
 
@@ -629,12 +554,12 @@ export default {
   justify-content: center !important;
 }
 
-:deep(.p-datatable-thead > tr > th:nth-child(6)) /* Acciones */ {
+:deep(.p-datatable-thead > tr > th:nth-child(5)) /* Acciones */ {
   text-align: center !important;
   vertical-align: middle !important;
 }
 
-:deep(.p-datatable-thead > tr > th:nth-child(6) .p-column-header-content) {
+:deep(.p-datatable-thead > tr > th:nth-child(5) .p-column-header-content) {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -809,7 +734,7 @@ export default {
   transform: scale(1.2);
   color: #28a745;
 }
-.total-usuarios {
+.total-productos {
   margin-top: 1.9rem;
   font-size: 1rem;
   font-weight: 500;

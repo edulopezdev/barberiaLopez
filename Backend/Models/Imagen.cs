@@ -1,28 +1,25 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace backend.Models
+public class Imagen
 {
-    public class Imagen
-    {
-        [Key]
-        public int? IdImagen { get; set; } // Clave primaria (auto_increment)
+    [Key]
+    public int IdImagen { get; set; }
 
-        [Required]
-        [MaxLength(255)]
-        public string? Ruta { get; set; } // Ruta del archivo de imagen
+    [Required]
+    [MaxLength(255)]
+    public string Ruta { get; set; } = string.Empty;
 
-        [Required]
-        [Column(TypeName = "enum('AvatarUsuario','ProductoServicio','ComprobantePago')")]
-        public string? TipoImagen { get; set; } // Tipo de imagen
+    [Required]
+    [Column(TypeName = "varchar(50)")]
+    public string TipoImagen { get; set; } = string.Empty;
 
-        [Required]
-        public int? IdRelacionado { get; set; } // Relación con la entidad correspondiente
+    [Required]
+    public int IdRelacionado { get; set; }
 
-        [Required]
-        public DateTime FechaCreacion { get; set; } = DateTime.Now; // Timestamp por defecto
+    [Required]
+    public DateTime FechaCreacion { get; set; } = DateTime.Now;
 
-        [Required]
-        public bool Activo { get; set; } = true; // Indica si la imagen está activa
-    }
+    [Required]
+    public bool Activo { get; set; } = true;
 }

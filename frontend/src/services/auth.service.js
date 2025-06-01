@@ -41,4 +41,9 @@ export default {
     const user = this.getUser();
     return user && user.rol === role;
   },
+  getUserRole() {
+  const user = this.getUser();
+  return user ? user.rolNombre : null; 
+},
+
 };

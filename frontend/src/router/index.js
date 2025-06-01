@@ -7,6 +7,8 @@ import EditarCliente from "@/views/EditarCliente.vue";
 
 import UsuariosView from "../views/UsuariosView.vue";
 
+import ProductosView from "../views/ProductosView.vue";
+
 import PerfilView from "../views/PerfilView.vue";
 
 import LoginView from "../views/LoginView.vue";
@@ -54,15 +56,33 @@ const routes = [
     path: "/usuarios",
     name: "Usuarios",
     component: UsuariosView,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, requiredRole: "Administrador" },
   },
+  ,
   {
     path: "/perfil",
     name: "Perfil",
     component: PerfilView,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, requiredRole: ["Administrador", "Barbero"] },
   },
-
+  {
+    path: "/productos",
+    name: "Productos",
+    component: ProductosView,
+    meta: { requiresAuth: true, requiredRole: "Administrador" },
+  },
+  {
+    path: "/productos/nuevo",
+    name: "NuevoProducto",
+    component: () => import("../views/ProductosView.vue"), // o un componente específico como `ProductoFormView.vue`
+    meta: { requiresAuth: true, requiredRole: "Administrador" },
+  },
+  {
+    path: "/productos/editar/:id",
+    name: "EditarProducto",
+    component: () => import("../views/ProductosView.vue"),
+    meta: { requiresAuth: true, requiredRole: "Administrador" },
+  },
   {
     path: "/:catchAll(.*)", // Redirige cualquier ruta no existente al login
     redirect: "/login",
@@ -78,14 +98,28 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth);
   const isLoggedIn = authService.isAuthenticated();
+  const requiredRole = to.meta.requiredRole;
 
   if (requiresAuth && !isLoggedIn) {
-    next("/login");
-  } else if (to.path === "/login" && isLoggedIn) {
-    next("/dashboard"); // Si estamos en el login y estamos autenticados, redirigimos al dashboard
-  } else {
-    next();
+    return next("/login");
   }
+
+  if (requiredRole) {
+    const userRole = authService.getUserRole();
+    const allowedRoles = Array.isArray(requiredRole)
+      ? requiredRole
+      : [requiredRole];
+    if (!allowedRoles.includes(userRole)) {
+      return next("/home");
+    }
+  }
+
+  if (to.path === "/login" && isLoggedIn) {
+    return next("/dashboard");
+  }
+
+  // Si no hubo redirección, continuar con la navegación normal
+  next();
 });
 
 export default router;

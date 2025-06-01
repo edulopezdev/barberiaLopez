@@ -167,7 +167,7 @@ export default {
         const res = await UsuarioService.getPerfil();
         this.usuarioActual = res.data.usuario;
 
-        // ✅ Actualiza el usuario guardado en sessionStorage
+        // Actualiza el usuario guardado en sessionStorage
         sessionStorage.setItem("user", JSON.stringify(this.usuarioActual));
 
         Swal.fire({
@@ -176,6 +176,8 @@ export default {
           text: "Tu perfil ha sido actualizado correctamente.",
           timer: 1500,
           showConfirmButton: false,
+          background: "#18181b",
+          color: "#fff",
         });
 
         this.cerrarModal();

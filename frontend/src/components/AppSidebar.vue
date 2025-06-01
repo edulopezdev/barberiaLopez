@@ -7,7 +7,7 @@
       class="app-logo"
     />
     <ul class="menu-list">
-      <li v-for="(item, i) in menuItems" :key="i">
+      <li v-for="(item, i) in filteredMenuItems" :key="i">
         <router-link :to="item.route" class="menu-item" active-class="active">
           <i :class="['menu-icon', item.icon]"></i>
           <span class="menu-label">{{ item.label }}</span>
@@ -18,21 +18,86 @@
 </template>
 
 <script>
+import authService from "../services/auth.service";
+
 export default {
+  props: {
+    role: { type: String, required: true },
+  },
   name: "AppSidebar",
   data() {
     return {
+      isAuthenticated: false,
+      userRole: null,
       menuItems: [
-        { label: "Inicio", route: "/dashboard", icon: "pi pi-home" },
-        { label: "Clientes", route: "/clientes", icon: "pi pi-users" },
-        { label: "Turnos", route: "/turnos", icon: "pi pi-calendar" },
-        { label: "Productos", route: "/productos", icon: "pi pi-box" },
-        { label: "Servicios", route: "/servicios", icon: "pi pi-wrench" },
-        { label: "Caja", route: "/caja", icon: "pi pi-credit-card" },
-        { label: "Usuarios", route: "/usuarios", icon: "pi pi-user" },
-        { label: "Perfil", route: "/perfil", icon: "pi pi-user-edit" },
+        {
+          label: "Inicio",
+          route: "/dashboard",
+          icon: "pi pi-home",
+          rolesAllowed: ["Administrador", "Barbero"],
+        },
+        {
+          label: "Clientes",
+          route: "/clientes",
+          icon: "pi pi-users",
+          rolesAllowed: ["Administrador", "Barbero"],
+        },
+        {
+          label: "Turnos",
+          route: "/turnos",
+          icon: "pi pi-calendar",
+          rolesAllowed: ["Administrador", "Barbero"],
+        },
+        {
+          label: "Productos",
+          route: "/productos",
+          icon: "pi pi-box",
+          rolesAllowed: ["Administrador", "Barbero"],
+        },
+        {
+          label: "Servicios",
+          route: "/servicios",
+          icon: "pi pi-wrench",
+          rolesAllowed: ["Administrador", "Barbero"],
+        },
+        {
+          label: "Caja",
+          route: "/caja",
+          icon: "pi pi-credit-card",
+          rolesAllowed: ["Administrador", "Barbero"],
+        },
+        {
+          label: "Usuarios",
+          route: "/usuarios",
+          icon: "pi pi-user",
+          rolesAllowed: ["Administrador"],
+        },
+        {
+          label: "Perfil",
+          route: "/perfil",
+          icon: "pi pi-user-edit",
+          rolesAllowed: ["Administrador", "Barbero"],
+        },
       ],
     };
+  },
+  watch: {
+    $route: {
+      immediate: true,
+      handler() {
+        this.isAuthenticated = authService.isAuthenticated();
+        const user = authService.getUser();
+        this.userRole = user?.rol || null;
+      },
+    },
+  },
+  computed: {
+    filteredMenuItems() {
+      const filtrados = this.menuItems.filter(
+        (item) => item.rolesAllowed && item.rolesAllowed.includes(this.role)
+      );
+      return filtrados;
+    },
   },
 };
 </script>

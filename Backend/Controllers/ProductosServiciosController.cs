@@ -18,11 +18,75 @@ namespace backend.Controllers
 
         // GET: api/productosservicios (Obtener todos los productos)
         [HttpGet("almacenables")]
-        public IActionResult GetProductosAlmacenables(int page = 1, int pageSize = 10)
+        public IActionResult GetProductosAlmacenables(
+            int page = 1,
+            int pageSize = 10,
+            string? sort = null,
+            string? order = null,
+            string? nombre = null,
+            string? descripcion = null,
+            decimal? precio = null,
+            int? cantidad = null
+        )
         {
-            var query = _context
-                .ProductosServicios.Where(p => p.EsAlmacenable ?? false) // aca manejamos correctamente el null
-                .OrderBy(p => p.Nombre);
+            var query = _context.ProductosServicios.Where(p => p.EsAlmacenable == true);
+
+            // Filtros seguros
+            if (!string.IsNullOrEmpty(nombre))
+            {
+                query = query.Where(p =>
+                    !string.IsNullOrEmpty(p.Nombre) && p.Nombre.Contains(nombre)
+                );
+            }
+
+            if (!string.IsNullOrEmpty(descripcion))
+            {
+                query = query.Where(p =>
+                    !string.IsNullOrEmpty(p.Descripcion) && p.Descripcion.Contains(descripcion)
+                );
+            }
+
+            if (precio.HasValue && precio.Value > 0)
+            {
+                query = query.Where(p => p.Precio == precio.Value);
+            }
+
+            if (cantidad.HasValue && cantidad.Value >= 0)
+            {
+                query = query.Where(p => p.Cantidad == cantidad.Value);
+            }
+
+            // Ordenamiento seguro
+            switch (sort?.ToLower())
+            {
+                case "nombre":
+                    query =
+                        order == "desc"
+                            ? query.OrderByDescending(p => p.Nombre)
+                            : query.OrderBy(p => p.Nombre);
+                    break;
+
+                case "precio":
+                    query =
+                        order == "desc"
+                            ? query.OrderByDescending(p => p.Precio)
+                            : query.OrderBy(p => p.Precio);
+                    break;
+
+                case "cantidad":
+                    query =
+                        order == "desc"
+                            ? query.OrderByDescending(p => p.Cantidad)
+                            : query.OrderBy(p => p.Cantidad);
+                    break;
+
+                default:
+                    query =
+                        order == "desc"
+                            ? query.OrderByDescending(p => p.Nombre)
+                            : query.OrderBy(p => p.Nombre);
+                    break;
+            }
 
             var totalProductos = query.Count();
             var productos = query.Skip((page - 1) * pageSize).Take(pageSize).ToList();
@@ -32,8 +96,8 @@ namespace backend.Controllers
                 {
                     status = 200,
                     message = totalProductos > 0
-                        ? "Lista de productos almacenables obtenida correctamente."
-                        : "No hay productos almacenables disponibles.",
+                        ? "Lista obtenida correctamente."
+                        : "No hay productos.",
                     pagination = new
                     {
                         totalPages = (int)Math.Ceiling((double)totalProductos / pageSize),
@@ -41,7 +105,7 @@ namespace backend.Controllers
                         pageSize,
                         totalProductos,
                     },
-                    productos = productos ?? new List<ProductoServicio>(), // esto es para evitar nulls
+                    productos,
                 }
             );
         }
@@ -84,14 +148,14 @@ namespace backend.Controllers
             if (productoServicio == null)
             {
                 return NotFound(
-                    new
-                    {
-                        status = 404,
-                        error = "Not Found",
-                        message = "El producto o servicio no existe.",
-                    }
+                    new { status = 404, message = "El producto o servicio no existe." }
                 );
             }
+
+            // Buscamos imagen relacionada
+            var imagen = _context.Imagen.FirstOrDefault(i =>
+                i.TipoImagen == "ProductoServicio" && i.IdRelacionado == id && i.Activo == true
+            );
 
             return Ok(
                 new
@@ -99,6 +163,7 @@ namespace backend.Controllers
                     status = 200,
                     message = "Producto o servicio encontrado.",
                     productoServicio,
+                    imagen,
                 }
             );
         }
@@ -107,6 +172,11 @@ namespace backend.Controllers
         [HttpPost]
         public async Task<IActionResult> PostProductoServicio(ProductoServicio productoServicio)
         {
+            if (productoServicio == null)
+            {
+                return BadRequest(new { status = 400, message = "El producto recibido es nulo." });
+            }
+
             if (string.IsNullOrEmpty(productoServicio.Nombre))
             {
                 return BadRequest(
@@ -119,7 +189,7 @@ namespace backend.Controllers
                 );
             }
 
-            // Validación: Un producto no almacenable no puede tener cantidad mayor a 0
+            // Ahora es seguro acceder a las propiedades
             if (!(productoServicio.EsAlmacenable ?? false) && productoServicio.Cantidad > 0)
             {
                 return BadRequest(
@@ -138,12 +208,7 @@ namespace backend.Controllers
             return CreatedAtAction(
                 nameof(GetProductoServicio),
                 new { id = productoServicio.Id },
-                new
-                {
-                    status = 201,
-                    message = "Producto o servicio creado correctamente.",
-                    productoServicio,
-                }
+                productoServicio
             );
         }
 
@@ -167,6 +232,18 @@ namespace backend.Controllers
             }
 
             // 🔹 Validación: Un producto no almacenable no puede tener cantidad mayor a 0
+            if (productoServicio == null)
+            {
+                return BadRequest(
+                    new
+                    {
+                        status = 400,
+                        error = "Bad Request",
+                        message = "No se recibió el producto/servicio para actualizar.",
+                    }
+                );
+            }
+
             if (!(productoServicio.EsAlmacenable ?? false) && productoServicio.Cantidad > 0)
             {
                 return BadRequest(
@@ -259,6 +336,27 @@ namespace backend.Controllers
                     productoEliminado = productoServicio.Nombre,
                 }
             );
+        }
+
+        [HttpGet("{id}/imagen")]
+        public IActionResult GetImagen(int id)
+        {
+            var imagen = _context.Imagen.FirstOrDefault(i =>
+                i.TipoImagen == "ProductoServicio" && i.IdRelacionado == id && i.Activo == true
+            );
+
+            if (imagen == null || string.IsNullOrEmpty(imagen.Ruta))
+            {
+                return NotFound(
+                    new
+                    {
+                        status = 404,
+                        message = "No hay imagen disponible para este producto o servicio.",
+                    }
+                );
+            }
+
+            return PhysicalFile(Path.Combine("wwwroot", imagen.Ruta.TrimStart('/')), "image/jpeg");
         }
     }
 }

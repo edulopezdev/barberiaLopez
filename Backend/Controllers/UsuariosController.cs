@@ -528,6 +528,18 @@ namespace backend.Controllers
             usuarioExistente.Telefono = dto.Telefono;
             usuarioExistente.Avatar = dto.Avatar;
 
+            // Evitar que un administrador se cambie su propio rol
+            if (
+                esAdministrador
+                && usuarioExistente.Id == usuarioIdLogueado
+                && dto.RolId != usuarioExistente.RolId
+            )
+            {
+                return BadRequest(
+                    new { status = 400, message = "No puedes cambiar tu propio rol." }
+                );
+            }
+
             // Solo admin puede cambiar rol
             if (esAdministrador)
             {

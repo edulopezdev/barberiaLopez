@@ -49,7 +49,9 @@
         optionLabel="label"
         optionValue="value"
         placeholder="Seleccionar rol"
+        :disabled="deshabilitarRol"
       />
+
       <div v-if="errores.rolId" class="error-msg">
         <i class="pi pi-exclamation-triangle"></i> {{ errores.rolId }}
       </div>
@@ -98,6 +100,7 @@
 import InputText from "primevue/inputtext";
 import Dropdown from "primevue/dropdown";
 import Button from "primevue/button";
+import authService from "../services/auth.service";
 
 export default {
   name: "UsuarioForm",
@@ -127,6 +130,7 @@ export default {
         rolId: null,
         password: null,
       },
+      usuarioLogueadoId: authService.getUser()?.id || null,
     };
   },
   mounted() {
@@ -203,6 +207,14 @@ export default {
       datos.accedeAlSistema = true; // siempre por defecto
 
       this.$emit("guardar", datos);
+    },
+  },
+  computed: {
+    deshabilitarRol() {
+      return (
+        this.usuarioLogueadoId !== null &&
+        this.form.id === this.usuarioLogueadoId
+      );
     },
   },
 };

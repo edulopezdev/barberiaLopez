@@ -11,6 +11,7 @@ export default {
   data() {
     return {
       isAuthenticated: false,
+      userRole: null,
     };
   },
   watch: {
@@ -18,11 +19,13 @@ export default {
       immediate: true,
       handler() {
         this.isAuthenticated = authService.isAuthenticated();
+        this.userRole = authService.getUserRole();
       },
     },
   },
   mounted() {
     this.isAuthenticated = authService.isAuthenticated();
+    this.userRole = authService.getUserRole();
   },
 };
 </script>
@@ -35,7 +38,7 @@ export default {
 
     <div class="layout">
       <!-- Sidebar fijo a la izquierda -->
-      <AppSidebar class="sidebar" v-if="isAuthenticated" />
+      <AppSidebar class="sidebar" :role="userRole" v-if="isAuthenticated" />
 
       <!-- Contenido principal a la derecha -->
       <main class="main-content">
