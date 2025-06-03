@@ -154,7 +154,6 @@ export default {
       }
     },
     validarFormulario() {
-      console.log("Validando formulario...", this.form);
       this.errores = {
         nombre: null,
         email: null,
@@ -193,8 +192,6 @@ export default {
       return valido;
     },
     onGuardar() {
-      console.log("Click en guardar");
-
       if (!this.validarFormulario()) return;
       console.warn("Formulario inválido", this.errores);
 

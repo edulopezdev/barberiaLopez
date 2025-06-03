@@ -1,6 +1,16 @@
 <template>
   <div class="formulario-producto">
-    <h3>{{ form.id ? "Editar Producto" : "Nuevo Producto" }}</h3>
+    <h3>
+      {{
+        form.id
+          ? esServicio
+            ? "Editar Servicio"
+            : "Editar Producto"
+          : esServicio
+          ? "Nuevo Servicio"
+          : "Nuevo Producto"
+      }}
+    </h3>
 
     <!-- Nombre -->
     <div class="campo" :class="{ error: errores.nombre }">
@@ -23,7 +33,13 @@
     <!-- Precio -->
     <div class="campo" :class="{ error: errores.precio }">
       <label for="precio">Precio <span class="obligatorio">*</span></label>
-      <InputNumber id="precio" v-model="form.precio" mode="currency" currency="USD" locale="en-US" />
+      <InputNumber
+        id="precio"
+        v-model="form.precio"
+        mode="currency"
+        currency="USD"
+        locale="en-US"
+      />
       <div v-if="errores.precio" class="error-msg">
         <i class="pi pi-exclamation-triangle"></i> {{ errores.precio }}
       </div>
@@ -36,7 +52,11 @@
     </div>
 
     <!-- Cantidad (solo visible si es almacenable) -->
-    <div class="campo" v-if="form.esAlmacenable" :class="{ error: errores.cantidad }">
+    <div
+      class="campo"
+      v-if="form.esAlmacenable"
+      :class="{ error: errores.cantidad }"
+    >
       <label for="cantidad">Cantidad</label>
       <InputNumber id="cantidad" v-model="form.cantidad" />
       <div v-if="errores.cantidad" class="error-msg">
@@ -98,13 +118,24 @@ import FileUpload from "primevue/fileupload";
 
 export default {
   name: "ProductoServicioForm",
-  components: { InputText, Textarea, InputNumber, Checkbox, Button, FileUpload },
+  components: {
+    InputText,
+    Textarea,
+    InputNumber,
+    Checkbox,
+    Button,
+    FileUpload,
+  },
   props: {
     productoServicio: Object,
     almacenablePorDefecto: {
       type: Boolean,
-      default: null // null = editable, true/false = fijo
-    }
+      default: null,
+    },
+    esServicio: {
+      type: Boolean,
+      default: false,
+    },
   },
   data() {
     return {
@@ -117,15 +148,15 @@ export default {
         cantidad: 0,
         imagen: "",
         nuevoArchivo: null,
-        eliminarImagenFlag: false
+        eliminarImagenFlag: false,
       },
       previewImagen: null,
       errores: {
         nombre: null,
         descripcion: null,
         precio: null,
-        cantidad: null
-      }
+        cantidad: null,
+      },
     };
   },
   mounted() {
@@ -139,7 +170,7 @@ export default {
         cantidad: this.productoServicio.cantidad ?? 0,
         imagen: this.productoServicio.rutaImagen || "",
         nuevoArchivo: null,
-        eliminarImagenFlag: false
+        eliminarImagenFlag: false,
       };
     } else {
       // Si no hay datos, usamos el valor por defecto
@@ -165,7 +196,7 @@ export default {
         nombre: null,
         descripcion: null,
         precio: null,
-        cantidad: null
+        cantidad: null,
       };
 
       let valido = true;
@@ -197,6 +228,10 @@ export default {
 
       const formData = new FormData();
 
+      if (this.form.id !== null) {
+        formData.append("Id", this.form.id);
+      }
+
       formData.append("Nombre", this.form.nombre);
       formData.append("Descripcion", this.form.descripcion || "");
       formData.append("Precio", this.form.precio);
@@ -215,20 +250,21 @@ export default {
       }
 
       this.$emit("guardar", formData);
-    }
+    },
   },
   computed: {
     imagenUrl() {
       if (this.previewImagen) return this.previewImagen;
       if (this.form.imagen) {
-        const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:5042";
+        const baseUrl =
+          import.meta.env.VITE_API_BASE_URL || "http://localhost:5042";
         return this.form.imagen.startsWith("http")
           ? this.form.imagen
           : `${baseUrl}${this.form.imagen}`;
       }
       return "/img/no-image.png"; // placeholder por defecto
-    }
-  }
+    },
+  },
 };
 </script>
 

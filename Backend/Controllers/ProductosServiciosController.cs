@@ -1,5 +1,7 @@
 using backend.Data;
+using backend.Dtos;
 using backend.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,6 +20,7 @@ namespace backend.Controllers
 
         // GET: api/productosservicios (Obtener todos los productos)
         [HttpGet("almacenables")]
+        [Authorize(Roles = "Administrador,Barbero")]
         public IActionResult GetProductosAlmacenables(
             int page = 1,
             int pageSize = 10,
@@ -89,7 +92,29 @@ namespace backend.Controllers
             }
 
             var totalProductos = query.Count();
-            var productos = query.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+            var productosDb = query.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+
+            var productosDto = productosDb
+                .Select(p =>
+                {
+                    var imagen = _context.Imagen.FirstOrDefault(i =>
+                        i.TipoImagen == "ProductoServicio"
+                        && i.IdRelacionado == p.Id
+                        && i.Activo == true
+                    );
+
+                    return new ProductoServicioConImagenDto
+                    {
+                        Id = p.Id,
+                        Nombre = p.Nombre,
+                        Descripcion = p.Descripcion,
+                        Precio = p.Precio,
+                        EsAlmacenable = p.EsAlmacenable,
+                        Cantidad = p.Cantidad,
+                        RutaImagen = imagen?.Ruta,
+                    };
+                })
+                .ToList();
 
             return Ok(
                 new
@@ -105,29 +130,85 @@ namespace backend.Controllers
                         pageSize,
                         totalProductos,
                     },
-                    productos,
+                    productos = productosDto,
                 }
             );
         }
 
-        // GET: api/productosservicios (Obtener todos los servicios)
+        // GET: api/productosservicios/noAlmacenables (Obtener todos los servicios)
         [HttpGet("noAlmacenables")]
-        public IActionResult GetProductosNoAlmacenables(int page = 1, int pageSize = 10)
+        [Authorize(Roles = "Administrador,Barbero")]
+        public IActionResult GetProductosNoAlmacenables(
+            int page = 1,
+            int pageSize = 10,
+            string? sort = null,
+            string? order = null
+        )
         {
-            var query = _context
-                .ProductosServicios.Where(p => !(p.EsAlmacenable ?? false)) // aca con el ! manejamos correctamente el null
-                .OrderBy(p => p.Nombre);
+            var query = _context.ProductosServicios.Where(p => !(p.EsAlmacenable ?? false));
+
+            // Aplicar ordenamiento
+            switch (sort?.ToLower())
+            {
+                case "nombre":
+                    query =
+                        order == "desc"
+                            ? query.OrderByDescending(p => p.Nombre)
+                            : query.OrderBy(p => p.Nombre);
+                    break;
+
+                case "precio":
+                    query =
+                        order == "desc"
+                            ? query.OrderByDescending(p => p.Precio)
+                            : query.OrderBy(p => p.Precio);
+                    break;
+
+                case "descripcion":
+                    query =
+                        order == "desc"
+                            ? query.OrderByDescending(p => p.Descripcion)
+                            : query.OrderBy(p => p.Descripcion);
+                    break;
+
+                default:
+                    // Orden por defecto
+                    query = query.OrderBy(p => p.Nombre);
+                    break;
+            }
 
             var totalProductos = query.Count();
-            var productos = query.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+            var productosDb = query.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+
+            var productosDto = productosDb
+                .Select(p =>
+                {
+                    var imagen = _context.Imagen.FirstOrDefault(i =>
+                        i.TipoImagen == "ProductoServicio"
+                        && i.IdRelacionado == p.Id
+                        && i.Activo == true
+                    );
+
+                    return new ProductoServicioConImagenDto
+                    {
+                        Id = p.Id,
+                        Nombre = p.Nombre,
+                        Descripcion = p.Descripcion,
+                        Precio = p.Precio,
+                        EsAlmacenable = p.EsAlmacenable,
+                        Cantidad = p.Cantidad,
+                        RutaImagen = imagen?.Ruta,
+                    };
+                })
+                .ToList();
 
             return Ok(
                 new
                 {
                     status = 200,
                     message = totalProductos > 0
-                        ? "Lista de productos no almacenables obtenida correctamente."
-                        : "No hay productos no almacenables disponibles.",
+                        ? "Lista de servicios obtenida correctamente."
+                        : "No hay servicios disponibles.",
                     pagination = new
                     {
                         totalPages = (int)Math.Ceiling((double)totalProductos / pageSize),
@@ -135,13 +216,14 @@ namespace backend.Controllers
                         pageSize,
                         totalProductos,
                     },
-                    productos = productos ?? new List<ProductoServicio>(), // esto es para evitar nulls
+                    productos = productosDto,
                 }
             );
         }
 
         // GET: api/productosservicios/{id}
         [HttpGet("{id}")]
+        [Authorize(Roles = "Administrador,Barbero")]
         public async Task<IActionResult> GetProductoServicio(int id)
         {
             var productoServicio = await _context.ProductosServicios.FindAsync(id);
@@ -170,113 +252,191 @@ namespace backend.Controllers
 
         // POST: api/productosservicios
         [HttpPost]
-        public async Task<IActionResult> PostProductoServicio(ProductoServicio productoServicio)
+        [Authorize(Roles = "Administrador,Barbero")]
+        public async Task<IActionResult> PostProductoServicio(
+            [FromForm] ProductoServicioCrearDto dto
+        )
         {
-            if (productoServicio == null)
-            {
-                return BadRequest(new { status = 400, message = "El producto recibido es nulo." });
-            }
+            if (string.IsNullOrEmpty(dto.Nombre))
+                return BadRequest(new { status = 400, message = "El nombre es obligatorio." });
 
-            if (string.IsNullOrEmpty(productoServicio.Nombre))
-            {
+            if (!(dto.EsAlmacenable ?? false) && dto.Cantidad > 0)
                 return BadRequest(
-                    new
-                    {
-                        status = 400,
-                        error = "Bad Request",
-                        message = "El nombre del producto o servicio es obligatorio.",
-                    }
+                    new { status = 400, message = "Un servicio no puede tener cantidad > 0." }
                 );
-            }
 
-            // Ahora es seguro acceder a las propiedades
-            if (!(productoServicio.EsAlmacenable ?? false) && productoServicio.Cantidad > 0)
+            var producto = new ProductoServicio
             {
-                return BadRequest(
-                    new
-                    {
-                        status = 400,
-                        error = "Bad Request",
-                        message = "Un producto no almacenable no puede tener cantidad mayor a 0.",
-                    }
-                );
-            }
+                Nombre = dto.Nombre,
+                Descripcion = dto.Descripcion,
+                Precio = dto.Precio,
+                EsAlmacenable = dto.EsAlmacenable,
+                Cantidad = dto.Cantidad,
+            };
 
-            _context.ProductosServicios.Add(productoServicio);
+            _context.ProductosServicios.Add(producto);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(
-                nameof(GetProductoServicio),
-                new { id = productoServicio.Id },
-                productoServicio
-            );
+            if (dto.Imagen != null && dto.Imagen.Length > 0)
+            {
+                // Carpeta base según tipo (producto o servicio)
+                string baseFolder = (producto.EsAlmacenable ?? false) ? "productos" : "servicios";
+
+                // Ruta completa: wwwroot/images/productos/{id} o wwwroot/images/servicios/{id}
+                var uploadsPath = Path.Combine(
+                    Directory.GetCurrentDirectory(),
+                    "wwwroot",
+                    "images",
+                    baseFolder,
+                    producto.Id.ToString()
+                );
+
+                Directory.CreateDirectory(uploadsPath); // crea carpeta si no existe
+
+                var fileName = $"{Guid.NewGuid()}{Path.GetExtension(dto.Imagen.FileName)}";
+                var fullPath = Path.Combine(uploadsPath, fileName);
+
+                using (var stream = new FileStream(fullPath, FileMode.Create))
+                {
+                    await dto.Imagen.CopyToAsync(stream);
+                }
+
+                var nuevaImagen = new Imagen
+                {
+                    Ruta = $"/images/{baseFolder}/{producto.Id}/{fileName}",
+                    TipoImagen = "ProductoServicio",
+                    IdRelacionado = producto.Id,
+                    Activo = true,
+                    FechaCreacion = DateTime.UtcNow,
+                };
+
+                _context.Imagen.Add(nuevaImagen);
+                await _context.SaveChangesAsync();
+            }
+
+            return CreatedAtAction(nameof(GetProductoServicio), new { id = producto.Id }, producto);
         }
 
         // PUT: api/productosservicios/{id}
         [HttpPut("{id}")]
+        [Authorize(Roles = "Administrador,Barbero")]
         public async Task<IActionResult> PutProductoServicio(
             int id,
-            ProductoServicio productoServicio
+            [FromForm] ProductoServicioConImagenDto dto
         )
         {
-            if (id != productoServicio.Id)
+            if (id != dto.Id)
             {
                 return BadRequest(
                     new
                     {
                         status = 400,
-                        error = "Bad Request",
                         message = "El ID en la URL no coincide con el ID del cuerpo de la solicitud.",
                     }
                 );
             }
 
-            // 🔹 Validación: Un producto no almacenable no puede tener cantidad mayor a 0
+            var productoServicio = await _context.ProductosServicios.FindAsync(id);
             if (productoServicio == null)
             {
-                return BadRequest(
-                    new
-                    {
-                        status = 400,
-                        error = "Bad Request",
-                        message = "No se recibió el producto/servicio para actualizar.",
-                    }
+                return NotFound(
+                    new { status = 404, message = "El producto o servicio no existe." }
                 );
             }
 
-            if (!(productoServicio.EsAlmacenable ?? false) && productoServicio.Cantidad > 0)
+            if (!(dto.EsAlmacenable ?? false) && dto.Cantidad > 0)
             {
                 return BadRequest(
                     new
                     {
                         status = 400,
-                        error = "Bad Request",
                         message = "Un producto no almacenable no puede tener cantidad mayor a 0.",
                     }
                 );
             }
 
-            _context.Entry(productoServicio).State = EntityState.Modified;
+            // Actualizar campos
+            productoServicio.Nombre = dto.Nombre;
+            productoServicio.Descripcion = dto.Descripcion;
+            productoServicio.Precio = dto.Precio;
+            productoServicio.EsAlmacenable = dto.EsAlmacenable;
+            productoServicio.Cantidad = dto.Cantidad;
 
-            try
+            // Manejo de imagen
+            if (dto.Imagen != null && dto.Imagen.Length > 0)
             {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!_context.ProductosServicios.Any(e => e.Id == id))
+                // Buscar imagen existente en DB
+                var imagenExistente = _context.Imagen.FirstOrDefault(i =>
+                    i.TipoImagen == "ProductoServicio" && i.IdRelacionado == id && i.Activo == true
+                );
+
+                string baseFolder =
+                    (productoServicio.EsAlmacenable ?? false) ? "productos" : "servicios";
+                var carpetaPath = Path.Combine(
+                    Directory.GetCurrentDirectory(),
+                    "wwwroot",
+                    "images",
+                    baseFolder,
+                    id.ToString()
+                );
+
+                if (imagenExistente != null)
                 {
-                    return NotFound(
-                        new
-                        {
-                            status = 404,
-                            error = "Not Found",
-                            message = "El producto o servicio no existe.",
-                        }
+                    // Borrar archivo físico anterior
+                    var rutaFisicaAnterior = Path.Combine(
+                        Directory.GetCurrentDirectory(),
+                        "wwwroot",
+                        imagenExistente
+                            .Ruta.TrimStart('/')
+                            .Replace('/', Path.DirectorySeparatorChar)
                     );
+                    if (System.IO.File.Exists(rutaFisicaAnterior))
+                    {
+                        System.IO.File.Delete(rutaFisicaAnterior);
+                    }
+
+                    // Actualizar ruta imagen
+                    var fileName = $"{Guid.NewGuid()}{Path.GetExtension(dto.Imagen.FileName)}";
+                    var fullPath = Path.Combine(carpetaPath, fileName);
+                    Directory.CreateDirectory(carpetaPath);
+
+                    using (var stream = new FileStream(fullPath, FileMode.Create))
+                    {
+                        await dto.Imagen.CopyToAsync(stream);
+                    }
+
+                    imagenExistente.Ruta = $"/images/{baseFolder}/{id}/{fileName}";
+                    imagenExistente.FechaCreacion = DateTime.UtcNow;
+                    _context.Imagen.Update(imagenExistente);
                 }
-                throw;
+                else
+                {
+                    // No había imagen previa: crear carpeta y guardar
+                    Directory.CreateDirectory(carpetaPath);
+
+                    var fileName = $"{Guid.NewGuid()}{Path.GetExtension(dto.Imagen.FileName)}";
+                    var fullPath = Path.Combine(carpetaPath, fileName);
+
+                    using (var stream = new FileStream(fullPath, FileMode.Create))
+                    {
+                        await dto.Imagen.CopyToAsync(stream);
+                    }
+
+                    var nuevaImagen = new Imagen
+                    {
+                        Ruta = $"/images/{baseFolder}/{id}/{fileName}",
+                        TipoImagen = "ProductoServicio",
+                        IdRelacionado = id,
+                        Activo = true,
+                        FechaCreacion = DateTime.UtcNow,
+                    };
+
+                    _context.Imagen.Add(nuevaImagen);
+                }
             }
+
+            _context.ProductosServicios.Update(productoServicio);
+            await _context.SaveChangesAsync();
 
             return Ok(
                 new
@@ -290,22 +450,17 @@ namespace backend.Controllers
 
         // DELETE: api/productosservicios/{id}
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Administrador")]
         public async Task<IActionResult> DeleteProductoServicio(int id)
         {
             var productoServicio = await _context.ProductosServicios.FindAsync(id);
             if (productoServicio == null)
             {
                 return NotFound(
-                    new
-                    {
-                        status = 404,
-                        error = "Not Found",
-                        message = "El producto o servicio no existe.",
-                    }
+                    new { status = 404, message = "El producto o servicio no existe." }
                 );
             }
 
-            // 🔹 Verificar si el producto está vinculado en `detalle_atencion`
             var tieneDependencias = _context.DetalleAtencion.Any(d => d.ProductoServicioId == id);
             if (tieneDependencias)
             {
@@ -313,14 +468,56 @@ namespace backend.Controllers
                     new
                     {
                         status = 400,
-                        error = "Bad Request",
                         message = "No se puede eliminar el producto porque está vinculado a una atención.",
-                        details = new
-                        {
-                            ProductoServicioId = id,
-                            Relacion = "DetalleAtencion",
-                            Motivo = "Restricción de clave foránea",
-                        },
+                    }
+                );
+            }
+
+            // Eliminar imagen/es relacionadas y archivos físicos
+            var imagenes = _context
+                .Imagen.Where(i => i.TipoImagen == "ProductoServicio" && i.IdRelacionado == id)
+                .ToList();
+
+            foreach (var imagen in imagenes)
+            {
+                var rutaFisica = Path.Combine(
+                    Directory.GetCurrentDirectory(),
+                    "wwwroot",
+                    imagen.Ruta.TrimStart('/').Replace('/', Path.DirectorySeparatorChar)
+                );
+                if (System.IO.File.Exists(rutaFisica))
+                {
+                    System.IO.File.Delete(rutaFisica);
+                }
+                _context.Imagen.Remove(imagen);
+            }
+
+            // Borrar carpeta del producto o servicio
+            string baseFolder =
+                (productoServicio.EsAlmacenable ?? false) ? "productos" : "servicios";
+            var carpetaPath = Path.Combine(
+                Directory.GetCurrentDirectory(),
+                "wwwroot",
+                "images",
+                baseFolder,
+                id.ToString()
+            );
+
+            try
+            {
+                if (Directory.Exists(carpetaPath))
+                {
+                    Directory.Delete(carpetaPath, true); // elimina carpeta y todo su contenido
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(
+                    500,
+                    new
+                    {
+                        status = 500,
+                        message = $"No se pudo eliminar la carpeta del producto: {ex.Message}",
                     }
                 );
             }
@@ -338,7 +535,46 @@ namespace backend.Controllers
             );
         }
 
+        // DELETE: api/productosservicios/imagen/{idImagen}
+        [HttpDelete("imagen/{idImagen}")]
+        [Authorize(Roles = "Administrador")]
+        public async Task<IActionResult> DeleteImagen(int idImagen)
+        {
+            var imagen = await _context.Imagen.FindAsync(idImagen);
+            if (imagen == null)
+            {
+                return NotFound(new { status = 404, message = "La imagen no existe." });
+            }
+
+            var rutaFisica = Path.Combine(
+                Directory.GetCurrentDirectory(),
+                "wwwroot",
+                imagen.Ruta.TrimStart('/').Replace('/', Path.DirectorySeparatorChar)
+            );
+            if (System.IO.File.Exists(rutaFisica))
+            {
+                System.IO.File.Delete(rutaFisica);
+            }
+
+            _context.Imagen.Remove(imagen);
+            await _context.SaveChangesAsync();
+
+            // Verificar si la carpeta quedó vacía y eliminarla
+            var carpetaPath = Path.GetDirectoryName(rutaFisica);
+            if (
+                Directory.Exists(carpetaPath)
+                && !Directory.EnumerateFileSystemEntries(carpetaPath).Any()
+            )
+            {
+                Directory.Delete(carpetaPath);
+            }
+
+            return Ok(new { status = 200, message = "Imagen eliminada correctamente." });
+        }
+
+        // GET: api/productosservicios/{id}/imagen
         [HttpGet("{id}/imagen")]
+        [Authorize(Roles = "Administrador,Barbero")]
         public IActionResult GetImagen(int id)
         {
             var imagen = _context.Imagen.FirstOrDefault(i =>

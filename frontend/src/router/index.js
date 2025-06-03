@@ -8,6 +8,11 @@ import EditarCliente from "@/views/EditarCliente.vue";
 import UsuariosView from "../views/UsuariosView.vue";
 
 import ProductosView from "../views/ProductosView.vue";
+import ServiciosView from "../views/ServiciosView.vue";
+
+import VentasView from "../views/VentasView.vue";
+import VentaForm from "../components/VentaForm.vue";
+import VentaDetalle from "../components/VentaDetalle.vue";
 
 import PerfilView from "../views/PerfilView.vue";
 
@@ -69,19 +74,63 @@ const routes = [
     path: "/productos",
     name: "Productos",
     component: ProductosView,
-    meta: { requiresAuth: true, requiredRole: "Administrador" },
+    meta: { requiresAuth: true, requiredRole: ["Administrador", "Barbero"] },
   },
   {
     path: "/productos/nuevo",
     name: "NuevoProducto",
-    component: () => import("../views/ProductosView.vue"), // o un componente específico como `ProductoFormView.vue`
-    meta: { requiresAuth: true, requiredRole: "Administrador" },
+    component: () => import("../views/ProductosView.vue"),
+    meta: { requiresAuth: true, requiredRole: ["Administrador", "Barbero"] },
   },
   {
     path: "/productos/editar/:id",
     name: "EditarProducto",
     component: () => import("../views/ProductosView.vue"),
-    meta: { requiresAuth: true, requiredRole: "Administrador" },
+    meta: { requiresAuth: true, requiredRole: ["Administrador", "Barbero"] },
+  },
+  {
+    path: "/servicios",
+    name: "Servicios",
+    component: ServiciosView,
+    meta: { requiresAuth: true, requiredRole: ["Administrador", "Barbero"] },
+  },
+  {
+    path: "/servicios/nuevo",
+    name: "NuevoServicio",
+    component: () => import("../views/ServiciosView.vue"),
+    meta: { requiresAuth: true, requiredRole: ["Administrador", "Barbero"] },
+  },
+  {
+    path: "/servicios/editar/:id",
+    name: "EditarServicio",
+    component: () => import("../views/ServiciosView.vue"),
+    meta: { requiresAuth: true, requiredRole: ["Administrador", "Barbero"] },
+  },
+  {
+    path: "/ventas",
+    name: "Ventas",
+    component: VentasView,
+    meta: { requiresAuth: true, requiredRole: ["Administrador", "Barbero"] },
+  },
+  {
+    path: "/ventas/nuevo",
+    name: "VentaNueva",
+    component: VentaForm,
+    meta: { requiresAuth: true, requiredRole: ["Administrador", "Barbero"] },
+  },
+  {
+    path: "/ventas/:id/editar",
+    name: "VentaEditar",
+    component: VentaForm,
+    props: true,
+    meta: { requiresAuth: true, requiredRole: ["Administrador", "Barbero"] },
+  },
+  {
+    path: "/ventas/:id/detalle",
+    name: "VentaDetalle",
+    component: VentaDetalle,
+    props: true,
+    meta: { requiresAuth: true, requiredRole: ["Administrador", "Barbero"] },
   },
   {
     path: "/:catchAll(.*)", // Redirige cualquier ruta no existente al login

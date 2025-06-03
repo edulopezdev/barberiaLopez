@@ -2,12 +2,9 @@ import axios from "axios";
 
 const apiClient = axios.create({
   baseURL: "http://localhost:5042/api",
-  headers: {
-    "Content-Type": "multipart/form-data",
-  },
 });
 
-// Interceptor para token (si aplica)
+// Interceptor para agregar token si existe
 apiClient.interceptors.request.use((config) => {
   const token = sessionStorage.getItem("token");
   if (token) {
@@ -17,76 +14,78 @@ apiClient.interceptors.request.use((config) => {
 });
 
 export default {
-  // === PRODUCTOS (almacenable = true) ===
+  // ==============================
+  // === PRODUCTOS (EsAlmacenable = true)
+  // ==============================
   getProductos(page = 1, pageSize = 10, filtros = {}) {
-    const params = new URLSearchParams({
-      page,
-      pageSize,
-      ...filtros,
+    const params = new URLSearchParams();
+    params.append("page", page);
+    params.append("pageSize", pageSize);
+    Object.entries(filtros).forEach(([key, value]) => {
+      if (value !== null && value !== undefined && value !== "") {
+        params.append(key, value);
+      }
     });
-
-    return apiClient.get(
-      `/productosservicios/almacenables?${params.toString()}`
-    );
+    return apiClient.get(`/productosservicios/almacenables?${params.toString()}`);
   },
 
   getProducto(id) {
     return apiClient.get(`/productosservicios/${id}`);
   },
 
-  crearProducto(productoData) {
-    return apiClient.post("/productosservicios", productoData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
+  crearProducto(formData) {
+    return apiClient.post("/productosservicios", formData);
   },
 
-  actualizarProducto(id, productoData) {
-    return apiClient.put(`/productosservicios/${id}`, productoData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
+  actualizarProducto(id, formData) {
+    return apiClient.put(`/productosservicios/${id}`, formData);
   },
 
   eliminarProducto(id) {
     return apiClient.delete(`/productosservicios/${id}`);
   },
 
-  // === SERVICIOS (almacenable = false) ===
+  // ==============================
+  // === SERVICIOS (EsAlmacenable = false)
+  // ==============================
   getServicios(page = 1, pageSize = 10, filtros = {}) {
-    const params = new URLSearchParams({
-      page,
-      pageSize,
-      ...filtros,
+    const params = new URLSearchParams();
+    params.append("page", page);
+    params.append("pageSize", pageSize);
+    Object.entries(filtros).forEach(([key, value]) => {
+      if (value !== null && value !== undefined && value !== "") {
+        params.append(key, value);
+      }
     });
-    return apiClient.get(
-      `/productosservicios/noAlmacenables?${params.toString()}`
-    );
+    return apiClient.get(`/productosservicios/noAlmacenables?${params.toString()}`);
   },
 
   getServicio(id) {
     return apiClient.get(`/productosservicios/${id}`);
   },
 
-  crearServicio(servicioData) {
-    return apiClient.post("/productosservicios", servicioData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
+  crearServicio(formData) {
+    return apiClient.post("/productosservicios", formData);
   },
 
-  actualizarServicio(id, servicioData) {
-    return apiClient.put(`/productosservicios/${id}`, servicioData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
+  actualizarServicio(id, formData) {
+    return apiClient.put(`/productosservicios/${id}`, formData);
   },
 
   eliminarServicio(id) {
     return apiClient.delete(`/productosservicios/${id}`);
+  },
+
+  // ==============================
+  // === IMÁGENES (comunes a ambos)
+  // ==============================
+  eliminarImagen(idImagen) {
+    return apiClient.delete(`/productosservicios/imagen/${idImagen}`);
+  },
+
+  obtenerImagen(idProductoServicio) {
+    return apiClient.get(`/productosservicios/${idProductoServicio}/imagen`, {
+      responseType: "blob",
+    });
   },
 };

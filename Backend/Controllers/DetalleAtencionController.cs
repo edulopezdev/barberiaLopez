@@ -1,4 +1,5 @@
 using backend.Data;
+using backend.Dtos;
 using backend.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -69,6 +70,71 @@ namespace backend.Controllers
                     status = 200,
                     message = "Detalle de atención encontrado.",
                     detalleAtencion,
+                }
+            );
+        }
+
+        [HttpGet("ventas")]
+        public async Task<IActionResult> GetVentas(int page = 1, int pageSize = 10)
+        {
+            var query = _context
+                .Atencion.Include(a => a.Cliente)
+                .ThenInclude(u => u.Rol)
+                .Include(a => a.DetalleAtencion)
+                .ThenInclude(d => d.ProductoServicio)
+                .Where(a => a.DetalleAtencion.Any());
+
+            var totalVentas = await query.CountAsync();
+
+            var ventasEnMemoria = query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .AsEnumerable()
+                .Select(a => new VentaDto
+                {
+                    AtencionId = a.Id,
+                    ClienteNombre = a.Cliente?.Nombre ?? "Cliente Desconocido",
+                    FechaAtencion = a.Fecha,
+
+                    Detalles = a
+                        .DetalleAtencion.Select(d => new DetalleVentaDto
+                        {
+                            ProductoServicioId = d.ProductoServicioId,
+                            NombreProducto =
+                                d.ProductoServicio?.Nombre ?? "Producto/Servicio borrado",
+                            Cantidad = d.Cantidad,
+                            PrecioUnitario = d.PrecioUnitario,
+                        })
+                        .ToList(),
+
+                    Pago =
+                        a.Pago != null
+                            ? new PagoInfoDto
+                            {
+                                PagoId = a.Pago.Id,
+                                MetodoPago = a.Pago.MetodoPago,
+                                Monto = a.Pago.Monto,
+                                FechaPago = a.Pago.Fecha,
+                            }
+                            : null,
+                })
+                .ToList();
+
+            return Ok(
+                new
+                {
+                    status = 200,
+                    message = totalVentas > 0
+                        ? "Lista de ventas obtenida correctamente."
+                        : "No hay ventas registradas.",
+                    pagination = new
+                    {
+                        totalVentas = totalVentas,
+                        totalPages = (int)Math.Ceiling((double)totalVentas / pageSize),
+                        currentPage = page,
+                        pageSize,
+                    },
+                    ventas = ventasEnMemoria,
                 }
             );
         }

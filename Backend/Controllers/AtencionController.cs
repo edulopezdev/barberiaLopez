@@ -201,5 +201,50 @@ namespace backend.Controllers
                 }
             );
         }
+
+        // GET: api/atencion/resumen-barbero (Obtener resumen de estadísticas de un barbero en un periodo específico)
+        [HttpGet("resumen-barbero")]
+        public IActionResult GetResumenBarbero(int barberoId, int mes = 0, int anio = 0)
+        {
+            // Si no se pasa mes/anio, usar el actual
+            if (mes == 0 || anio == 0)
+            {
+                var fechaActual = DateTime.Now;
+                mes = fechaActual.Month;
+                anio = fechaActual.Year;
+            }
+
+            // Filtrar atenciones del barbero en el periodo dado
+            var query = _context.Atencion.Where(a => a.BarberoId == barberoId);
+
+            // Filtrar por mes y año
+            query = query.Where(a => a.Fecha.Month == mes && a.Fecha.Year == anio);
+
+            // Obtener todas las atenciones del barbero en ese periodo
+            var atenciones = query.ToList();
+
+            // Calcular ingresos totales
+            decimal totalIngresos = atenciones.Sum(a => a.Total);
+
+            // Contar cantidad de atenciones
+            int totalAtenciones = atenciones.Count;
+
+            int totalCortes = atenciones.Count; // Ejemplo básico
+            int totalServicios = 0;
+
+            return Ok(
+                new
+                {
+                    status = 200,
+                    data = new
+                    {
+                        totalAtenciones,
+                        totalCortes,
+                        totalServicios,
+                        totalIngresos,
+                    },
+                }
+            );
+        }
     }
 }

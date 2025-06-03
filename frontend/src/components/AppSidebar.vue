@@ -61,8 +61,8 @@ export default {
           rolesAllowed: ["Administrador", "Barbero"],
         },
         {
-          label: "Caja",
-          route: "/caja",
+          label: "Ventas",
+          route: "/ventas",
           icon: "pi pi-credit-card",
           rolesAllowed: ["Administrador", "Barbero"],
         },

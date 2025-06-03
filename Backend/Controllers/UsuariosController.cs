@@ -267,8 +267,8 @@ namespace backend.Controllers
                     new
                     {
                         status = 404,
-                        error = "Not Found",
-                        message = "El usuario no existe.",
+                        error = "Usuario no encontrado",
+                        message = "No se encontró ningún usuario con el ID proporcionado.",
                     }
                 );
             }
@@ -324,7 +324,8 @@ namespace backend.Controllers
                         new
                         {
                             status = 400,
-                            message = "Datos inválidos.",
+                            error = "Datos inválidos",
+                            message = "Uno o más campos son incorrectos.",
                             errors = ModelState,
                         }
                     );
@@ -593,7 +594,7 @@ namespace backend.Controllers
                     new
                     {
                         status = 401,
-                        error = "Unauthorized",
+                        error = "No autorizado",
                         message = "No se pudo determinar la identidad del usuario actual.",
                     }
                 );
@@ -685,13 +686,20 @@ namespace backend.Controllers
         {
             if (dto == null)
             {
-                return BadRequest(new { status = 400, message = "Datos inválidos." });
+                return BadRequest(new { status = 400, message = "Datos inválidos" });
             }
 
             var usuario = await _context.Usuario.FindAsync(id);
             if (usuario == null)
             {
-                return NotFound(new { status = 404, message = "El usuario no existe." });
+                return BadRequest(
+                    new
+                    {
+                        status = 400,
+                        error = "Datos inválidos",
+                        message = "Datos inválidos",
+                    }
+                );
             }
 
             var idUsuarioActual = User.GetUserId();
@@ -780,7 +788,14 @@ namespace backend.Controllers
 
             if (usuario == null)
             {
-                return NotFound(new { status = 404, message = "Usuario no encontrado." });
+                return NotFound(
+                    new
+                    {
+                        status = 404,
+                        error = "Usuario no encontrado",
+                        message = "El usuario especificado no existe.",
+                    }
+                );
             }
 
             var perfilDto = new UsuarioPerfilDto

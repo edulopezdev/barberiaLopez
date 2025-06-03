@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using backend.Data;
 using backend.Models;
@@ -23,5 +24,13 @@ namespace backend.Models
         public decimal Total { get; set; } // Monto total de la atención
 
         public int? TurnoId { get; set; } // Relación opcional con Turno (puede ser NULL)
+
+        // Propiedad de navegación
+        public Usuario Cliente { get; set; } = null!;
+        public Usuario Barbero { get; set; } = null!;
+        public ICollection<DetalleAtencion> DetalleAtencion { get; set; } =
+            new List<DetalleAtencion>();
+        public int? PagoId { get; set; }
+        public Pago? Pago { get; set; }
     }
 }

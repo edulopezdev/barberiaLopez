@@ -1,10 +1,10 @@
 <template>
-  <div class="clientes-container">
+  <div class="ventas-container">
     <Toast />
     <Card>
       <template #title>
         <div class="encabezado-acciones">
-          <h4>Clientes</h4>
+          <h4>Ventas</h4>
           <div class="botones-acciones">
             <Button
               label="Filtros"
@@ -13,10 +13,10 @@
               @click="mostrarFiltros = !mostrarFiltros"
             />
             <Button
-              label="Nuevo Cliente"
+              label="Nueva Venta"
               icon="pi pi-plus"
-              class="boton-nuevo-cliente"
-              @click="crearCliente"
+              class="boton-nueva-venta"
+              @click="crearVenta"
             />
           </div>
         </div>
@@ -25,58 +25,58 @@
       <template #content>
         <DataTable
           v-model:filters="filters"
-          :value="clientes"
+          :value="ventas"
           :filterDisplay="mostrarFiltros ? 'row' : 'none'"
-          :globalFilterFields="['nombre', 'email', 'telefono']"
+          :globalFilterFields="['cliente', 'producto', 'fecha']"
           lazy
           paginator
           :rows="pageSize"
           :first="first"
-          :totalRecords="totalClients"
+          :totalRecords="totalVentas"
           tableStyle="min-width: 100%"
           :loading="loading"
           @page="onPageChange"
           @sort="onSort"
           @filter="onFilter"
         >
-          <Column field="nombre" sortable>
+          <Column field="cliente" sortable>
             <template #header>
-              <span class="titulo-columna">Nombre</span>
+              <span class="titulo-columna">Cliente</span>
             </template>
             <template #filter="{ filterModel, filterCallback }">
               <InputText
                 v-model="filterModel.value"
                 @input="filterCallback()"
-                placeholder="Buscar por nombre"
+                placeholder="Buscar por cliente"
               />
             </template>
           </Column>
 
-          <Column field="email" header="Email" sortable>
+          <Column field="producto" header="Producto" sortable>
             <template #filter="{ filterModel, filterCallback }">
               <InputText
                 v-model="filterModel.value"
                 @input="filterCallback()"
-                placeholder="Buscar por email"
+                placeholder="Buscar por producto"
               />
             </template>
           </Column>
 
-          <Column field="telefono" header="Teléfono" sortable>
+          <Column field="fecha" header="Fecha" sortable>
             <template #filter="{ filterModel, filterCallback }">
               <InputText
                 v-model="filterModel.value"
                 @input="filterCallback()"
-                placeholder="Buscar por teléfono"
+                placeholder="Buscar por fecha"
               />
             </template>
           </Column>
 
-          <Column field="activo" header="Estado">
+          <Column field="estado" header="Estado">
             <template #body="slotProps">
               <Tag
-                :value="slotProps.data.activo ? 'Activo' : 'Inactivo'"
-                :severity="slotProps.data.activo ? 'success' : 'danger'"
+                :value="slotProps.data.estado ? 'Completada' : 'Pendiente'"
+                :severity="slotProps.data.estado ? 'success' : 'warning'"
               />
             </template>
             <template #filter="{ filterModel, filterCallback }">
@@ -84,8 +84,8 @@
                 v-model="filterModel.value"
                 @change="filterCallback()"
                 :options="[
-                  { label: 'Activo', value: true },
-                  { label: 'Inactivo', value: false },
+                  { label: 'Completada', value: true },
+                  { label: 'Pendiente', value: false },
                 ]"
                 optionLabel="label"
                 placeholder="Seleccionar estado"
@@ -110,26 +110,24 @@
                   severity="warning"
                   text
                   rounded
-                  v-tooltip.bottom="'Editar cliente'"
-                  @click="editarCliente(slotProps.data)"
+                  v-tooltip.bottom="'Editar venta'"
+                  @click="editarVenta(slotProps.data)"
                 />
                 <Button
                   :icon="
-                    slotProps.data.activo ? 'pi pi-trash' : 'pi pi-refresh'
+                    slotProps.data.estado ? 'pi pi-trash' : 'pi pi-refresh'
                   "
-                  :severity="slotProps.data.activo ? 'danger' : 'success'"
+                  :severity="slotProps.data.estado ? 'danger' : 'success'"
                   text
                   rounded
-                  :label="slotProps.data.activo ? '' : ''"
+                  :label="slotProps.data.estado ? '' : ''"
                   :v-tooltip.bottom="
-                    slotProps.data.activo
-                      ? 'Eliminar cliente'
-                      : 'Reactivar cliente'
+                    slotProps.data.estado ? 'Anular venta' : 'Reactivar venta'
                   "
                   @click="
-                    slotProps.data.activo
-                      ? eliminarCliente(slotProps.data)
-                      : reactivarCliente(slotProps.data)
+                    slotProps.data.estado
+                      ? anularVenta(slotProps.data)
+                      : reactivarVenta(slotProps.data)
                   "
                 />
               </div>
@@ -138,47 +136,46 @@
         </DataTable>
 
         <!-- Mensaje de cantidad total -->
-        <div class="total-clientes" v-if="totalClients > 0">
-          Total de clientes registrados: {{ totalClients }}
+        <div class="total-ventas" v-if="totalVentas > 0">
+          Total de ventas registradas: {{ totalVentas }}
         </div>
       </template>
     </Card>
 
-    <!-- Modal Crear / Editar Cliente -->
+    <!-- Modal Crear / Editar Venta -->
     <Dialog
       v-model:visible="mostrarModal"
-      :header="clienteSeleccionado?.id ? 'Editar Cliente' : 'Nuevo Cliente'"
+      :header="ventaSeleccionada?.id ? 'Editar Venta' : 'Nueva Venta'"
       :modal="true"
       :closeOnEscape="false"
       :closeOnBackdropClick="false"
       :closable="false"
       style="width: 450px"
     >
-      <ClienteForm
-        :cliente="clienteSeleccionado"
-        @guardar="guardarCliente($event)"
+      <VentaForm
+        :venta="ventaSeleccionada"
+        @guardar="guardarVenta($event)"
         @cerrar="cerrarModal"
       />
     </Dialog>
 
-    <!-- Modal Detalle Cliente -->
+    <!-- Modal Detalle Venta -->
     <Dialog
       v-model:visible="mostrarDetalleModal"
-      header="Detalle del Cliente"
+      header="Detalle de la Venta"
       :modal="true"
       :closable="false"
       style="width: 450px"
     >
-      <ClienteDetalle
-        :cliente="clienteSeleccionado"
+      <VentaDetalle
+        :venta="ventaSeleccionada"
         @cerrar="mostrarDetalleModal = false"
       />
     </Dialog>
   </div>
 </template>
-
 <script>
-import UsuarioService from "../services/UsuarioService";
+import VentaService from "../services/VentaService";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Card from "primevue/card";
@@ -186,11 +183,12 @@ import Tag from "primevue/tag";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import Dropdown from "primevue/dropdown";
-import { FilterMatchMode } from "primevue/api";
 import Dialog from "primevue/dialog";
-import ClienteForm from "../components/ClienteForm.vue";
-import ClienteDetalle from "../components/ClienteDetalle.vue";
+import { FilterMatchMode } from "primevue/api";
 import Swal from "sweetalert2";
+
+import VentaForm from "../components/VentaForm.vue";
+import VentaDetalle from "../components/VentaDetalle.vue";
 
 export default {
   components: {
@@ -202,339 +200,212 @@ export default {
     InputText,
     Dropdown,
     Dialog,
-    ClienteForm,
-    ClienteDetalle,
+    VentaForm,
+    VentaDetalle,
   },
   data() {
     return {
-      mostrarFiltros: false,
-      clientes: [],
-      totalClients: 0,
+      ventas: [],
+      totalVentas: 0,
       currentPage: 1,
       pageSize: 10,
       first: 0,
       sortField: null,
       sortOrder: null,
       loading: false,
-      filters: {
-        nombre: { value: null, matchMode: FilterMatchMode.STARTS_WITH },
-        email: { value: null, matchMode: FilterMatchMode.CONTAINS },
-        telefono: { value: null, matchMode: FilterMatchMode.CONTAINS },
-        activo: { value: true, matchMode: FilterMatchMode.EQUALS },
-      },
-
+      mostrarFiltros: false,
       mostrarModal: false,
-      clienteSeleccionado: null,
+      ventaSeleccionada: null,
       mostrarDetalleModal: false,
-      clienteAEliminar: null,
-      mostrarConfirmacionEliminar: false,
+      filters: {
+        cliente: { value: null, matchMode: FilterMatchMode.CONTAINS },
+        producto: { value: null, matchMode: FilterMatchMode.CONTAINS },
+        fecha: { value: null, matchMode: FilterMatchMode.CONTAINS },
+        estado: { value: null, matchMode: FilterMatchMode.EQUALS },
+      },
     };
   },
   mounted() {
-    this.obtenerClientes();
+    this.obtenerVentas();
   },
   methods: {
-    // Modal: nuevo cliente
-    abrirModalNuevo(cliente = null) {
-
-      // Si se pasa un cliente (como al reabrir tras error), se mantiene ese objeto
-      this.clienteSeleccionado = cliente
-        ? { ...cliente } // aca se copia el objeto
-        : {
-            nombre: "",
-            email: "",
-            telefono: "",
-          };
-
-      this.mostrarModal = true;
-      document.body.classList.add("modal-open");
-    },
-    // Modal: editar cliente
-    abrirModalEditar(cliente) {
-      this.clienteSeleccionado = { ...cliente };
-      this.mostrarModal = true;
-    },
-    cerrarModal() {
-      this.mostrarModal = false;
-      document.body.classList.remove("modal-open");
-    },
-
-    async guardarCliente(clienteActualizado) {
-      if (clienteActualizado.id) {
-        this.cerrarModal();
-
-        const result = await Swal.fire({
-          title: `¿Actualizar a ${clienteActualizado.nombre}?`,
-          icon: "question",
-          showCancelButton: true,
-          confirmButtonColor: "#3085d6",
-          cancelButtonColor: "#6c757d",
-          confirmButtonText: "Sí, actualizar",
-          cancelButtonText: "Cancelar",
-          background: "#18181b",
-          color: "#fff",
-        });
-
-        if (result.isConfirmed) {
-          try {
-            await UsuarioService.actualizarUsuario(
-              clienteActualizado.id,
-              clienteActualizado
-            );
-            await Swal.fire({
-              title: "Actualizado",
-              text: `Cliente ${clienteActualizado.nombre} actualizado correctamente.`,
-              icon: "success",
-              timer: 2000,
-              timerProgressBar: true,
-              showConfirmButton: false,
-              background: "#18181b",
-              color: "#fff",
-            });
-            this.obtenerClientes();
-            this.verDetalles(clienteActualizado);
-          } catch (error) {
-            console.error("Error completo:", error);
-            const mensaje =
-              error?.response?.data?.message ||
-              "No se pudo actualizar el cliente.";
-
-            await Swal.fire({
-              title: "Error",
-              text: mensaje,
-              icon: "error",
-              background: "#18181b",
-              color: "#fff",
-            });
-
-            // Reabrir el modal y conservar los datos
-            this.abrirModalEditar({ ...clienteActualizado });
-          }
-        } else {
-          this.abrirModalEditar(clienteActualizado);
-        }
-      } else {
-        this.cerrarModal();
-
-        const result = await Swal.fire({
-          title: `¿Crear cliente ${clienteActualizado.nombre}?`,
-          icon: "question",
-          showCancelButton: true,
-          confirmButtonColor: "#3085d6",
-          cancelButtonColor: "#6c757d",
-          confirmButtonText: "Sí, crear",
-          cancelButtonText: "Cancelar",
-          background: "#18181b",
-          color: "#fff",
-        });
-
-        if (result.isConfirmed) {
-          try {
-            await UsuarioService.crearCliente(clienteActualizado);
-            await Swal.fire({
-              title: "Creado",
-              text: "Cliente creado correctamente.",
-              icon: "success",
-              timer: 2000,
-              timerProgressBar: true,
-              showConfirmButton: false,
-              background: "#18181b",
-              color: "#fff",
-            });
-            this.obtenerClientes();
-          } catch (error) {
-            console.error(error);
-
-            const mensaje =
-              error?.response?.data?.message || "No se pudo crear el cliente.";
-
-            await Swal.fire({
-              title: "Error",
-              text: mensaje,
-              icon: "error",
-              background: "#18181b",
-              color: "#fff",
-            });
-
-            // Reabrir el modal y conservar los datos
-            this.abrirModalNuevo({ ...clienteActualizado });
-          }
-        } else {
-          this.abrirModalNuevo(clienteActualizado);
-        }
-      }
-    },
-    // Acciones de UI
-    crearCliente() {
-      this.abrirModalNuevo();
-    },
-
-    verDetalles(cliente) {
-      UsuarioService.getCliente(cliente.id)
-        .then((res) => {
-          this.clienteSeleccionado = res.data.usuario;
-          this.mostrarDetalleModal = true;
-        })
-        .catch((err) => {
-          console.error("Error al obtener detalles del cliente:", err);
-          alert("No se pudo cargar el detalle del cliente.");
-        });
-    },
-    editarCliente(cliente) {
-      this.clienteSeleccionado = { ...cliente };
-      this.abrirModalEditar(cliente);
-    },
-
-    eliminarCliente(cliente) {
-      Swal.fire({
-        title: `¿Eliminar a ${cliente.nombre}?`,
-        text: "Esta acción no se puede deshacer.",
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonColor: "#e74c3c",
-        cancelButtonColor: "#6c757d",
-        confirmButtonText: "Sí, eliminar",
-        cancelButtonText: "Cancelar",
-        background: "#18181b",
-        color: "#fff",
-      }).then((result) => {
-        if (result.isConfirmed) {
-          UsuarioService.eliminarUsuario(cliente.id)
-            .then(() => {
-              Swal.fire({
-                title: "Eliminado",
-                text: `El cliente ${cliente.nombre} ha sido eliminado.`,
-                icon: "success",
-                timer: 2000,
-                timerProgressBar: true,
-                showConfirmButton: false,
-                background: "#18181b",
-                color: "#fff",
-              });
-              this.obtenerClientes(this.currentPage, this.pageSize);
-            })
-            .catch((err) => {
-              console.error("Error al eliminar cliente:", err);
-              Swal.fire({
-                title: "Error",
-                text: "No se pudo eliminar el cliente.",
-                icon: "error",
-                background: "#18181b",
-                color: "#fff",
-              });
-            });
-        }
-      });
-    },
-    confirmarEliminacion() {
-      UsuarioService.eliminarCliente(this.clienteAEliminar.id)
-        .then(() => {
-          this.obtenerClientes();
-          this.mostrarConfirmacionEliminar = false;
-          this.clienteAEliminar = null;
-        })
-        .catch((err) => {
-          console.error("Error al eliminar cliente:", err);
-          alert("Error al eliminar cliente");
-        });
-    },
-
-    // Carga de clientes con paginación, filtros y ordenamiento
-    obtenerClientes(page = 1, pageSize = 10) {
+    async obtenerVentas(page = 1, pageSize = 10) {
       this.loading = true;
 
-      const filtrosAplicados = {};
-      Object.keys(this.filters).forEach((key) => {
-        let val = this.filters[key]?.value;
-        if (val !== null && val !== undefined && val !== "") {
-          if (typeof val === "object" && val.hasOwnProperty("value")) {
-            val = val.value;
-          }
-          filtrosAplicados[key] = val;
-        }
-      });
-
-      if (this.sortField && this.sortOrder) {
-        filtrosAplicados.ordenarPor = this.sortField;
-        filtrosAplicados.ordenDescendente = this.sortOrder === -1;
+      try {
+        const res = await VentaService.getVentas(page, pageSize);
+        this.ventas = res.data.detalles || res.data;
+        this.totalVentas = res.data.pagination?.total || this.ventas.length;
+        this.currentPage = page;
+        this.pageSize = pageSize;
+        this.first = (page - 1) * pageSize;
+      } catch (err) {
+        console.error("Error al obtener ventas:", err);
+        Swal.fire("Error", "No se pudieron cargar las ventas.", "error");
+      } finally {
+        this.loading = false;
       }
-
-      UsuarioService.getClientes(page, pageSize, filtrosAplicados)
-        .then((res) => {
-          this.clientes = res.data.clientes;
-          this.totalClients = res.data.pagination.total;
-          this.pageSize = pageSize;
-          this.currentPage = page;
-          this.first = (page - 1) * pageSize;
-        })
-        .catch((err) => {
-          console.error("Error al cargar clientes:", err);
-        })
-        .finally(() => {
-          this.loading = false;
-        });
     },
 
-    // Eventos de la tabla
     onPageChange(event) {
-      const newPage = event.page + 1;
-      const newPageSize = event.rows;
-      this.first = event.first;
-
-      this.obtenerClientes(newPage, newPageSize);
+      this.obtenerVentas(event.page + 1, event.rows);
     },
 
     onSort(event) {
       this.sortField = event.sortField;
       this.sortOrder = event.sortOrder;
-      this.obtenerClientes(1, this.pageSize);
+      this.obtenerVentas(this.currentPage, this.pageSize);
     },
 
     onFilter() {
-      this.obtenerClientes(1, this.pageSize);
+      this.obtenerVentas(1, this.pageSize);
     },
 
-    aplicarFiltros() {
-      this.obtenerClientes(1, this.pageSize);
+    crearVenta() {
+      this.ventaSeleccionada = null;
+      this.mostrarModal = true;
+      document.body.classList.add("modal-open");
     },
-    reactivarCliente(cliente) {
-      Swal.fire({
-        title: `¿Reactivar a ${cliente.nombre}?`,
-        text: "El cliente volverá a estar activo.",
+
+    editarVenta(venta) {
+      this.ventaSeleccionada = { ...venta };
+      this.mostrarModal = true;
+      document.body.classList.add("modal-open");
+    },
+
+    cerrarModal() {
+      this.mostrarModal = false;
+      document.body.classList.remove("modal-open");
+    },
+
+    verDetalles(venta) {
+      VentaService.getVentaById(venta.id)
+        .then((res) => {
+          this.ventaSeleccionada = res.data.venta || res.data;
+          this.mostrarDetalleModal = true;
+        })
+        .catch(() => {
+          Swal.fire(
+            "Error",
+            "No se pudo cargar el detalle de la venta.",
+            "error"
+          );
+        });
+    },
+
+    async guardarVenta(ventaActualizada) {
+      this.cerrarModal();
+
+      const mensaje = ventaActualizada.id
+        ? "¿Actualizar esta venta?"
+        : "¿Registrar nueva venta?";
+
+      const result = await Swal.fire({
+        title: mensaje,
         icon: "question",
         showCancelButton: true,
-        confirmButtonColor: "#28a745",
+        confirmButtonColor: "#3085d6",
         cancelButtonColor: "#6c757d",
-        confirmButtonText: "Sí, reactivar",
+        confirmButtonText: "Sí, confirmar",
         cancelButtonText: "Cancelar",
+        background: "#18181b",
+        color: "#fff",
+      });
+
+      if (result.isConfirmed) {
+        try {
+          if (ventaActualizada.id) {
+            // Aquí podrías usar: await VentaService.actualizarVenta(ventaActualizada.id, ventaActualizada);
+          } else {
+            // Aquí podrías usar: await VentaService.crearVenta(ventaActualizada);
+          }
+
+          Swal.fire({
+            title: "Éxito",
+            text: `Venta ${
+              ventaActualizada.id ? "actualizada" : "creada"
+            } correctamente.`,
+            icon: "success",
+            timer: 2000,
+            showConfirmButton: false,
+            background: "#18181b",
+            color: "#fff",
+          });
+
+          this.obtenerVentas(this.currentPage, this.pageSize);
+        } catch (error) {
+          const mensaje =
+            error?.response?.data?.message || "No se pudo guardar la venta.";
+          console.error("Error al guardar venta:", error);
+          Swal.fire({
+            title: "Error",
+            text: mensaje,
+            icon: "error",
+            background: "#18181b",
+            color: "#fff",
+          });
+          this.ventaSeleccionada = ventaActualizada;
+          this.mostrarModal = true;
+        }
+      } else {
+        this.ventaSeleccionada = ventaActualizada;
+        this.mostrarModal = true;
+      }
+    },
+
+    anularVenta(venta) {
+      Swal.fire({
+        title: `¿Anular venta de ${venta.cliente}?`,
+        text: "Esta acción no se puede deshacer.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Sí, anular",
+        cancelButtonText: "Cancelar",
+        confirmButtonColor: "#e74c3c",
+        cancelButtonColor: "#6c757d",
         background: "#18181b",
         color: "#fff",
       }).then((result) => {
         if (result.isConfirmed) {
-          UsuarioService.cambiarEstado(cliente.id, true)
-            .then(() => {
-              Swal.fire({
-                title: "Reactivado",
-                text: `${cliente.nombre} ha sido reactivado.`,
-                icon: "success",
-                timer: 2000,
-                showConfirmButton: false,
-                background: "#18181b",
-                color: "#fff",
-              });
-              this.obtenerClientes(this.currentPage, this.pageSize);
-            })
-            .catch((err) => {
-              console.error("Error al reactivar cliente:", err);
-              Swal.fire({
-                title: "Error",
-                text: "No se pudo reactivar el cliente.",
-                icon: "error",
-                background: "#18181b",
-                color: "#fff",
-                confirmButtonColor: "#e74c3c",
-              });
-            });
+          // Aquí podrías usar: VentaService.anularVenta(venta.id);
+          Swal.fire({
+            title: "Anulada",
+            text: "La venta ha sido anulada.",
+            icon: "success",
+            timer: 2000,
+            showConfirmButton: false,
+            background: "#18181b",
+            color: "#fff",
+          });
+          this.obtenerVentas(this.currentPage, this.pageSize);
+        }
+      });
+    },
+
+    reactivarVenta(venta) {
+      Swal.fire({
+        title: `¿Reactivar venta de ${venta.cliente}?`,
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonText: "Sí, reactivar",
+        cancelButtonText: "Cancelar",
+        confirmButtonColor: "#28a745",
+        cancelButtonColor: "#6c757d",
+        background: "#18181b",
+        color: "#fff",
+      }).then((result) => {
+        if (result.isConfirmed) {
+          // Aquí podrías usar: VentaService.reactivarVenta(venta.id);
+          Swal.fire({
+            title: "Reactivada",
+            text: "La venta ha sido reactivada.",
+            icon: "success",
+            timer: 2000,
+            showConfirmButton: false,
+            background: "#18181b",
+            color: "#fff",
+          });
+          this.obtenerVentas(this.currentPage, this.pageSize);
         }
       });
     },
@@ -546,7 +417,7 @@ export default {
 /* ===========================
    CONTENEDOR GENERAL
 =========================== */
-.clientes-container {
+.ventas-container {
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
@@ -586,7 +457,7 @@ export default {
   border-color: transparent !important;
 }
 
-.boton-nuevo-cliente {
+.boton-nueva-venta {
   background-color: #28a745;
   color: white;
   font-weight: normal;
@@ -597,7 +468,7 @@ export default {
   height: auto !important;
   min-width: 120px !important;
 }
-.boton-nuevo-cliente:hover {
+.boton-nueva-venta:hover {
   background-color: #218838;
 }
 
@@ -831,7 +702,8 @@ export default {
   transform: scale(1.2);
   color: #28a745;
 }
-.total-clientes {
+
+.total-ventas {
   margin-top: 1.9rem;
   font-size: 1rem;
   font-weight: 500;

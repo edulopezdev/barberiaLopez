@@ -92,46 +92,30 @@
               />
             </template>
           </Column>
-
-          <!-- Estado (de momento no lo usaremos) -->
-          <!--
-          <Column field="activo" header="Estado">
-            <template #body="slotProps">
-              <Tag
-                :value="slotProps.data.activo ? 'Activo' : 'Inactivo'"
-                :severity="slotProps.data.activo ? 'success' : 'danger'"
-              />
-            </template>
-            <template #filter="{ filterModel, filterCallback }">
-              <Dropdown
-                v-model="filterModel.value"
-                @change="filterCallback()"
-                :options="[
-                  { label: 'Activo', value: true },
-                  { label: 'Inactivo', value: false },
-                ]"
-                optionLabel="label"
-                placeholder="Seleccionar estado"
-                showClear
-              />
-            </template>
-          </Column>
-        -->
-
           <!-- Imagen -->
           <Column field="imagen" header="Imagen" style="min-width: 100px">
-            ...
-            <template #filter="{ filterModel, filterCallback }">
-              <Dropdown
-                v-model="filterModel.value"
-                :options="[
-                  { label: 'Todos', value: null },
-                  { label: 'Con imagen', value: 'con' },
-                  { label: 'Sin imagen', value: 'sin' },
-                ]"
-                @change="filterCallback()"
-                placeholder="Filtrar imagen"
-                showClear
+            <template #body="slotProps">
+              <img
+                v-if="slotProps.data.rutaImagen"
+                :src="getRutaImagen(slotProps.data.rutaImagen)"
+                alt="Imagen Producto"
+                style="
+                  width: 60px;
+                  height: 60px;
+                  object-fit: cover;
+                  border-radius: 4px;
+                "
+              />
+              <img
+                v-else
+                src="/img/no-image.jpg"
+                alt="Sin imagen"
+                style="
+                  width: 60px;
+                  height: 60px;
+                  object-fit: cover;
+                  border-radius: 4px;
+                "
               />
             </template>
           </Column>
@@ -157,6 +141,7 @@
                   @click="abrirModalEditar(slotProps.data)"
                 />
                 <Button
+                  v-if="esAdministrador"
                   icon="pi pi-trash"
                   severity="danger"
                   text
@@ -219,6 +204,7 @@ import Dropdown from "primevue/dropdown";
 import Dialog from "primevue/dialog";
 import { FilterMatchMode } from "primevue/api";
 import Swal from "sweetalert2";
+import authService from "../services/auth.service";
 
 // Componentes propios
 import ProductoServicioForm from "../components/ProductoServicioForm.vue";
@@ -241,12 +227,17 @@ export default {
     ProductoServicioForm,
     ProductoServicioDetalle,
   },
+  computed: {
+    esAdministrador() {
+      return authService.getUserRole() === "Administrador";
+    },
+  },
   data() {
     return {
       productos: [],
       totalProductos: 0,
       currentPage: 1,
-      pageSize: 10,
+      pageSize: 6,
       first: 0,
       sortField: null,
       sortOrder: null,
@@ -259,7 +250,7 @@ export default {
         descripcion: { value: null, matchMode: FilterMatchMode.CONTAINS },
         precio: { value: null, matchMode: FilterMatchMode.EQUALS },
         cantidad: { value: null, matchMode: FilterMatchMode.EQUALS },
-        imagen: { value: null, matchMode: FilterMatchMode.EQUALS }, 
+        imagen: { value: null, matchMode: FilterMatchMode.EQUALS },
       },
 
       // Modales
@@ -268,8 +259,9 @@ export default {
       mostrarDetalleModal: false,
     };
   },
+
   mounted() {
-    this.obtenerProductos();
+    this.obtenerProductos(1, 6);
   },
   methods: {
     formatPrecio(precio) {
@@ -282,8 +274,12 @@ export default {
       if (!ruta) return "/img/no-image.png";
       const baseUrl =
         import.meta.env.VITE_API_BASE_URL || "http://localhost:5042";
-      return ruta.startsWith("http") ? ruta : `${baseUrl}${ruta}`;
+      const fullUrl = ruta.startsWith("http")
+        ? ruta
+        : `${baseUrl}${ruta.startsWith("/") ? "" : "/"}${ruta}`;
+      return fullUrl;
     },
+
     abrirModalNuevo() {
       this.productoSeleccionado = null;
       this.mostrarModal = true;
@@ -331,8 +327,48 @@ export default {
               this.obtenerProductos();
             })
             .catch((err) => {
-              console.error(err);
-              Swal.fire("Error", "No se pudo eliminar el producto.", "error");
+              console.error("Error al eliminar producto:", err);
+
+              // Extraer mensaje del backend si existe
+              let errorMessage = "Ocurrió un error desconocido.";
+              let errorTitle = "Error";
+
+              if (err.response) {
+                // Respuesta con datos del servidor
+                const { status } = err.response;
+
+                if (status === 403) {
+                  errorMessage =
+                    err.response.data.message ||
+                    "No tienes permiso para realizar esta acción.";
+                  errorTitle = "Acceso denegado";
+                } else if (status === 400 || status === 404) {
+                  errorMessage =
+                    err.response.data.message ||
+                    "No se pudo procesar la solicitud.";
+                  errorTitle = "Advertencia";
+                } else {
+                  errorMessage =
+                    err.response.data.message ||
+                    "No se pudo eliminar el producto.";
+                  errorTitle = "Error";
+                }
+              } else if (err.request) {
+                // No hubo respuesta del servidor
+                errorMessage = "No se recibió respuesta del servidor.";
+                errorTitle = "Sin conexión";
+              } else {
+                // Otro tipo de error
+                errorMessage = err.message;
+              }
+
+              Swal.fire({
+                title: errorTitle,
+                text: errorMessage,
+                icon: "error",
+                background: "#18181b",
+                color: "#fff",
+              });
             });
         }
       });
@@ -382,7 +418,7 @@ export default {
           });
       }
     },
-    obtenerProductos(page = 1, pageSize = 10) {
+    obtenerProductos(page = 1, pageSize = 6) {
       this.loading = true;
 
       const filtrosAplicados = {};

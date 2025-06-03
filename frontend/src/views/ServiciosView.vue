@@ -1,10 +1,10 @@
 <template>
-  <div class="clientes-container">
+  <div class="servicios-container">
     <Toast />
     <Card>
       <template #title>
         <div class="encabezado-acciones">
-          <h4>Clientes</h4>
+          <h4>Servicios</h4>
           <div class="botones-acciones">
             <Button
               label="Filtros"
@@ -13,10 +13,10 @@
               @click="mostrarFiltros = !mostrarFiltros"
             />
             <Button
-              label="Nuevo Cliente"
+              label="Nuevo Servicio"
               icon="pi pi-plus"
-              class="boton-nuevo-cliente"
-              @click="crearCliente"
+              class="boton-nuevo-servicio"
+              @click="abrirModalNuevo()"
             />
           </div>
         </div>
@@ -25,21 +25,23 @@
       <template #content>
         <DataTable
           v-model:filters="filters"
-          :value="clientes"
+          :value="servicios"
           :filterDisplay="mostrarFiltros ? 'row' : 'none'"
-          :globalFilterFields="['nombre', 'email', 'telefono']"
           lazy
           paginator
           :rows="pageSize"
-          :first="first"
-          :totalRecords="totalClients"
+          :totalRecords="totalServicios"
           tableStyle="min-width: 100%"
           :loading="loading"
           @page="onPageChange"
           @sort="onSort"
           @filter="onFilter"
+          :customSort="true"
+          sortMode="single"
+          :autoLayout="true"
         >
-          <Column field="nombre" sortable>
+          <!-- Nombre -->
+          <Column field="nombre" header="Nombre" sortable>
             <template #header>
               <span class="titulo-columna">Nombre</span>
             </template>
@@ -52,48 +54,67 @@
             </template>
           </Column>
 
-          <Column field="email" header="Email" sortable>
+          <!-- Descripción -->
+          <Column field="descripcion" header="Descripción" sortable>
             <template #filter="{ filterModel, filterCallback }">
               <InputText
                 v-model="filterModel.value"
                 @input="filterCallback()"
-                placeholder="Buscar por email"
+                placeholder="Buscar por descripción"
               />
             </template>
           </Column>
 
-          <Column field="telefono" header="Teléfono" sortable>
-            <template #filter="{ filterModel, filterCallback }">
-              <InputText
-                v-model="filterModel.value"
-                @input="filterCallback()"
-                placeholder="Buscar por teléfono"
-              />
-            </template>
-          </Column>
-
-          <Column field="activo" header="Estado">
+          <!-- Precio -->
+          <Column field="precio" header="Precio" sortable>
             <template #body="slotProps">
-              <Tag
-                :value="slotProps.data.activo ? 'Activo' : 'Inactivo'"
-                :severity="slotProps.data.activo ? 'success' : 'danger'"
-              />
+              {{ formatPrecio(slotProps.data.precio) }}
             </template>
             <template #filter="{ filterModel, filterCallback }">
-              <Dropdown
+              <InputText
                 v-model="filterModel.value"
-                @change="filterCallback()"
-                :options="[
-                  { label: 'Activo', value: true },
-                  { label: 'Inactivo', value: false },
-                ]"
-                optionLabel="label"
-                placeholder="Seleccionar estado"
-                showClear
+                @input="filterCallback()"
+                placeholder="Buscar por precio"
               />
             </template>
           </Column>
 
+          <!-- Imagen -->
+          <Column
+            field="imagen"
+            header="Imagen"
+            style="min-width: 100px"
+            :filter="false"
+            :showFilterMenu="false"
+          >
+            <template #body="slotProps">
+              <img
+                v-if="slotProps.data.rutaImagen"
+                :src="getRutaImagen(slotProps.data.rutaImagen)"
+                alt="Imagen Servicio"
+                style="
+                  width: 60px;
+                  height: 60px;
+                  object-fit: cover;
+                  border-radius: 4px;
+                "
+              />
+              <img
+                v-else
+                src="/img/no-image.jpg"
+                alt="Sin imagen"
+                style="
+                  width: 60px;
+                  height: 60px;
+                  object-fit: cover;
+                  border-radius: 4px;
+                "
+              />
+            </template>
+            <template #filter> </template>
+          </Column>
+
+          <!-- Acciones -->
           <Column header="Acciones" style="min-width: 180px">
             <template #body="slotProps">
               <div class="acciones-botones">
@@ -110,67 +131,57 @@
                   severity="warning"
                   text
                   rounded
-                  v-tooltip.bottom="'Editar cliente'"
-                  @click="editarCliente(slotProps.data)"
+                  v-tooltip.bottom="'Editar servicio'"
+                  @click="abrirModalEditar(slotProps.data)"
                 />
                 <Button
-                  :icon="
-                    slotProps.data.activo ? 'pi pi-trash' : 'pi pi-refresh'
-                  "
-                  :severity="slotProps.data.activo ? 'danger' : 'success'"
+                  v-if="esAdministrador"
+                  icon="pi pi-trash"
+                  severity="danger"
                   text
                   rounded
-                  :label="slotProps.data.activo ? '' : ''"
-                  :v-tooltip.bottom="
-                    slotProps.data.activo
-                      ? 'Eliminar cliente'
-                      : 'Reactivar cliente'
-                  "
-                  @click="
-                    slotProps.data.activo
-                      ? eliminarCliente(slotProps.data)
-                      : reactivarCliente(slotProps.data)
-                  "
+                  v-tooltip.bottom="'Eliminar servicio'"
+                  @click="eliminarServicio(slotProps.data)"
                 />
               </div>
             </template>
           </Column>
         </DataTable>
 
-        <!-- Mensaje de cantidad total -->
-        <div class="total-clientes" v-if="totalClients > 0">
-          Total de clientes registrados: {{ totalClients }}
+        <div class="total-servicios" v-if="totalServicios > 0">
+          Total de servicios registrados: {{ totalServicios }}
         </div>
       </template>
     </Card>
 
-    <!-- Modal Crear / Editar Cliente -->
+    <!-- Modal Nuevo/Editar -->
     <Dialog
       v-model:visible="mostrarModal"
-      :header="clienteSeleccionado?.id ? 'Editar Cliente' : 'Nuevo Cliente'"
+      :header="servicioSeleccionado?.id ? 'Editar Servicio' : 'Nuevo Servicio'"
       :modal="true"
       :closeOnEscape="false"
-      :closeOnBackdropClick="false"
       :closable="false"
       style="width: 450px"
     >
-      <ClienteForm
-        :cliente="clienteSeleccionado"
-        @guardar="guardarCliente($event)"
-        @cerrar="cerrarModal"
+      <ProductoServicioForm
+        :productoServicio="servicioSeleccionado"
+        almacenablePorDefecto="false"
+        :esServicio="true"
+        @guardar="guardarServicio"
+        @cancelar="cerrarModal"
       />
     </Dialog>
 
-    <!-- Modal Detalle Cliente -->
+    <!-- Detalle (opcional por ahora) -->
     <Dialog
       v-model:visible="mostrarDetalleModal"
-      header="Detalle del Cliente"
+      header="Detalle del Servicio"
       :modal="true"
       :closable="false"
       style="width: 450px"
     >
-      <ClienteDetalle
-        :cliente="clienteSeleccionado"
+      <ProductoServicioDetalle
+        :producto="servicioSeleccionado"
         @cerrar="mostrarDetalleModal = false"
       />
     </Dialog>
@@ -178,216 +189,103 @@
 </template>
 
 <script>
-import UsuarioService from "../services/UsuarioService";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Card from "primevue/card";
-import Tag from "primevue/tag";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
-import Dropdown from "primevue/dropdown";
-import { FilterMatchMode } from "primevue/api";
 import Dialog from "primevue/dialog";
-import ClienteForm from "../components/ClienteForm.vue";
-import ClienteDetalle from "../components/ClienteDetalle.vue";
 import Swal from "sweetalert2";
+import { FilterMatchMode } from "primevue/api";
+import authService from "../services/auth.service";
+
+import ProductoServicioForm from "../components/ProductoServicioForm.vue";
+import ProductoServicioDetalle from "../components/ProductoServicioDetalle.vue";
+
+import productoServicioService from "../services/ProductoServicioService";
 
 export default {
+  name: "Servicios",
   components: {
     DataTable,
     Column,
     Card,
-    Tag,
     Button,
     InputText,
-    Dropdown,
     Dialog,
-    ClienteForm,
-    ClienteDetalle,
+    ProductoServicioForm,
+    ProductoServicioDetalle,
+  },
+  computed: {
+    esAdministrador() {
+      return authService.getUserRole() === "Administrador";
+    },
   },
   data() {
     return {
-      mostrarFiltros: false,
-      clientes: [],
-      totalClients: 0,
+      servicios: [],
+      totalServicios: 0,
       currentPage: 1,
-      pageSize: 10,
+      pageSize: 6,
       first: 0,
       sortField: null,
       sortOrder: null,
       loading: false,
+      mostrarFiltros: false,
+
       filters: {
-        nombre: { value: null, matchMode: FilterMatchMode.STARTS_WITH },
-        email: { value: null, matchMode: FilterMatchMode.CONTAINS },
-        telefono: { value: null, matchMode: FilterMatchMode.CONTAINS },
-        activo: { value: true, matchMode: FilterMatchMode.EQUALS },
+        nombre: { value: null, matchMode: FilterMatchMode.CONTAINS },
+        descripcion: { value: null, matchMode: FilterMatchMode.CONTAINS },
+        precio: { value: null, matchMode: FilterMatchMode.EQUALS },
+        imagen: { value: null, matchMode: FilterMatchMode.EQUALS },
       },
 
       mostrarModal: false,
-      clienteSeleccionado: null,
+      servicioSeleccionado: null,
       mostrarDetalleModal: false,
-      clienteAEliminar: null,
-      mostrarConfirmacionEliminar: false,
     };
   },
   mounted() {
-    this.obtenerClientes();
+    this.obtenerServicios(1, 6);
   },
   methods: {
-    // Modal: nuevo cliente
-    abrirModalNuevo(cliente = null) {
+    formatPrecio(precio) {
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+      }).format(precio);
+    },
+    getRutaImagen(ruta) {
+      if (!ruta) return "/img/no-image.png";
+      const baseUrl =
+        import.meta.env.VITE_API_BASE_URL || "http://localhost:5042";
+      const fullUrl = ruta.startsWith("http")
+        ? ruta
+        : `${baseUrl}${ruta.startsWith("/") ? "" : "/"}${ruta}`;
+      return fullUrl;
+    },
 
-      // Si se pasa un cliente (como al reabrir tras error), se mantiene ese objeto
-      this.clienteSeleccionado = cliente
-        ? { ...cliente } // aca se copia el objeto
-        : {
-            nombre: "",
-            email: "",
-            telefono: "",
-          };
-
+    abrirModalNuevo() {
+      this.servicioSeleccionado = null;
       this.mostrarModal = true;
       document.body.classList.add("modal-open");
     },
-    // Modal: editar cliente
-    abrirModalEditar(cliente) {
-      this.clienteSeleccionado = { ...cliente };
+    abrirModalEditar(servicio) {
+      this.servicioSeleccionado = { ...servicio };
       this.mostrarModal = true;
+      document.body.classList.add("modal-open");
     },
     cerrarModal() {
       this.mostrarModal = false;
       document.body.classList.remove("modal-open");
     },
-
-    async guardarCliente(clienteActualizado) {
-      if (clienteActualizado.id) {
-        this.cerrarModal();
-
-        const result = await Swal.fire({
-          title: `¿Actualizar a ${clienteActualizado.nombre}?`,
-          icon: "question",
-          showCancelButton: true,
-          confirmButtonColor: "#3085d6",
-          cancelButtonColor: "#6c757d",
-          confirmButtonText: "Sí, actualizar",
-          cancelButtonText: "Cancelar",
-          background: "#18181b",
-          color: "#fff",
-        });
-
-        if (result.isConfirmed) {
-          try {
-            await UsuarioService.actualizarUsuario(
-              clienteActualizado.id,
-              clienteActualizado
-            );
-            await Swal.fire({
-              title: "Actualizado",
-              text: `Cliente ${clienteActualizado.nombre} actualizado correctamente.`,
-              icon: "success",
-              timer: 2000,
-              timerProgressBar: true,
-              showConfirmButton: false,
-              background: "#18181b",
-              color: "#fff",
-            });
-            this.obtenerClientes();
-            this.verDetalles(clienteActualizado);
-          } catch (error) {
-            console.error("Error completo:", error);
-            const mensaje =
-              error?.response?.data?.message ||
-              "No se pudo actualizar el cliente.";
-
-            await Swal.fire({
-              title: "Error",
-              text: mensaje,
-              icon: "error",
-              background: "#18181b",
-              color: "#fff",
-            });
-
-            // Reabrir el modal y conservar los datos
-            this.abrirModalEditar({ ...clienteActualizado });
-          }
-        } else {
-          this.abrirModalEditar(clienteActualizado);
-        }
-      } else {
-        this.cerrarModal();
-
-        const result = await Swal.fire({
-          title: `¿Crear cliente ${clienteActualizado.nombre}?`,
-          icon: "question",
-          showCancelButton: true,
-          confirmButtonColor: "#3085d6",
-          cancelButtonColor: "#6c757d",
-          confirmButtonText: "Sí, crear",
-          cancelButtonText: "Cancelar",
-          background: "#18181b",
-          color: "#fff",
-        });
-
-        if (result.isConfirmed) {
-          try {
-            await UsuarioService.crearCliente(clienteActualizado);
-            await Swal.fire({
-              title: "Creado",
-              text: "Cliente creado correctamente.",
-              icon: "success",
-              timer: 2000,
-              timerProgressBar: true,
-              showConfirmButton: false,
-              background: "#18181b",
-              color: "#fff",
-            });
-            this.obtenerClientes();
-          } catch (error) {
-            console.error(error);
-
-            const mensaje =
-              error?.response?.data?.message || "No se pudo crear el cliente.";
-
-            await Swal.fire({
-              title: "Error",
-              text: mensaje,
-              icon: "error",
-              background: "#18181b",
-              color: "#fff",
-            });
-
-            // Reabrir el modal y conservar los datos
-            this.abrirModalNuevo({ ...clienteActualizado });
-          }
-        } else {
-          this.abrirModalNuevo(clienteActualizado);
-        }
-      }
+    verDetalles(servicio) {
+      this.servicioSeleccionado = { ...servicio };
+      this.mostrarDetalleModal = true;
     },
-    // Acciones de UI
-    crearCliente() {
-      this.abrirModalNuevo();
-    },
-
-    verDetalles(cliente) {
-      UsuarioService.getCliente(cliente.id)
-        .then((res) => {
-          this.clienteSeleccionado = res.data.usuario;
-          this.mostrarDetalleModal = true;
-        })
-        .catch((err) => {
-          console.error("Error al obtener detalles del cliente:", err);
-          alert("No se pudo cargar el detalle del cliente.");
-        });
-    },
-    editarCliente(cliente) {
-      this.clienteSeleccionado = { ...cliente };
-      this.abrirModalEditar(cliente);
-    },
-
-    eliminarCliente(cliente) {
+    eliminarServicio(servicio) {
       Swal.fire({
-        title: `¿Eliminar a ${cliente.nombre}?`,
+        title: `¿Eliminar "${servicio.nombre}"?`,
         text: "Esta acción no se puede deshacer.",
         icon: "warning",
         showCancelButton: true,
@@ -399,25 +297,55 @@ export default {
         color: "#fff",
       }).then((result) => {
         if (result.isConfirmed) {
-          UsuarioService.eliminarUsuario(cliente.id)
+          productoServicioService
+            .eliminarServicio(servicio.id)
             .then(() => {
               Swal.fire({
                 title: "Eliminado",
-                text: `El cliente ${cliente.nombre} ha sido eliminado.`,
+                text: `${servicio.nombre} eliminado correctamente.`,
                 icon: "success",
                 timer: 2000,
-                timerProgressBar: true,
                 showConfirmButton: false,
                 background: "#18181b",
                 color: "#fff",
               });
-              this.obtenerClientes(this.currentPage, this.pageSize);
+              this.obtenerServicios();
             })
             .catch((err) => {
-              console.error("Error al eliminar cliente:", err);
+              console.error("Error al eliminar servicio:", err);
+
+              // Extraer mensaje del backend si existe
+              let errorMessage = "Ocurrió un error desconocido.";
+              let errorTitle = "Error";
+
+              if (err.response) {
+                const { status } = err.response;
+
+                if (status === 403) {
+                  errorMessage =
+                    err.response.data.message ||
+                    "No tienes permiso para realizar esta acción.";
+                  errorTitle = "Acceso denegado";
+                } else if (status === 400 || status === 404) {
+                  errorMessage =
+                    err.response.data.message ||
+                    "No se pudo procesar la solicitud.";
+                  errorTitle = "Advertencia";
+                } else {
+                  errorMessage =
+                    err.response.data.message ||
+                    "No se pudo eliminar el servicio.";
+                }
+              } else if (err.request) {
+                errorMessage = "No se recibió respuesta del servidor.";
+                errorTitle = "Sin conexión";
+              } else {
+                errorMessage = err.message;
+              }
+
               Swal.fire({
-                title: "Error",
-                text: "No se pudo eliminar el cliente.",
+                title: errorTitle,
+                text: errorMessage,
                 icon: "error",
                 background: "#18181b",
                 color: "#fff",
@@ -426,26 +354,57 @@ export default {
         }
       });
     },
-    confirmarEliminacion() {
-      UsuarioService.eliminarCliente(this.clienteAEliminar.id)
-        .then(() => {
-          this.obtenerClientes();
-          this.mostrarConfirmacionEliminar = false;
-          this.clienteAEliminar = null;
-        })
-        .catch((err) => {
-          console.error("Error al eliminar cliente:", err);
-          alert("Error al eliminar cliente");
-        });
+    guardarServicio(formData) {
+      if (this.servicioSeleccionado?.id) {
+        productoServicioService
+          .actualizarServicio(this.servicioSeleccionado.id, formData)
+          .then(() => {
+            Swal.fire({
+              title: "Actualizado",
+              text: "Servicio actualizado correctamente.",
+              icon: "success",
+              timer: 2000,
+              showConfirmButton: false,
+              background: "#18181b",
+              color: "#fff",
+            });
+            this.obtenerServicios();
+            this.cerrarModal();
+          })
+          .catch((err) => {
+            console.error(err);
+            Swal.fire("Error", "No se pudo actualizar el servicio.", "error");
+          });
+      } else {
+        productoServicioService
+          .crearServicio(formData)
+          .then(() => {
+            Swal.fire({
+              title: "Creado",
+              text: "Servicio creado correctamente.",
+              icon: "success",
+              timer: 2000,
+              showConfirmButton: false,
+              background: "#18181b",
+              color: "#fff",
+            });
+            this.obtenerServicios();
+            this.cerrarModal();
+          })
+          .catch((err) => {
+            console.error(err);
+            Swal.fire("Error", "No se pudo crear el servicio.", "error");
+          });
+      }
     },
-
-    // Carga de clientes con paginación, filtros y ordenamiento
-    obtenerClientes(page = 1, pageSize = 10) {
+    obtenerServicios(page = 1, pageSize = 6) {
       this.loading = true;
 
       const filtrosAplicados = {};
+
       Object.keys(this.filters).forEach((key) => {
         let val = this.filters[key]?.value;
+
         if (val !== null && val !== undefined && val !== "") {
           if (typeof val === "object" && val.hasOwnProperty("value")) {
             val = val.value;
@@ -454,89 +413,38 @@ export default {
         }
       });
 
-      if (this.sortField && this.sortOrder) {
-        filtrosAplicados.ordenarPor = this.sortField;
-        filtrosAplicados.ordenDescendente = this.sortOrder === -1;
+      if (this.sortField) {
+        filtrosAplicados.sort = this.sortField;
+        filtrosAplicados.order = this.sortOrder === 1 ? "asc" : "desc";
       }
 
-      UsuarioService.getClientes(page, pageSize, filtrosAplicados)
-        .then((res) => {
-          this.clientes = res.data.clientes;
-          this.totalClients = res.data.pagination.total;
-          this.pageSize = pageSize;
+      productoServicioService
+        .getServicios(page, pageSize, filtrosAplicados)
+        .then((response) => {
+          const data = response.data;
+          this.servicios = data.productos;
+          this.totalServicios = data.pagination.totalProductos;
           this.currentPage = page;
+          this.pageSize = pageSize;
           this.first = (page - 1) * pageSize;
         })
-        .catch((err) => {
-          console.error("Error al cargar clientes:", err);
+        .catch((error) => {
+          console.error("Error al obtener servicios:", error);
         })
         .finally(() => {
           this.loading = false;
         });
     },
-
-    // Eventos de la tabla
     onPageChange(event) {
-      const newPage = event.page + 1;
-      const newPageSize = event.rows;
-      this.first = event.first;
-
-      this.obtenerClientes(newPage, newPageSize);
+      this.obtenerServicios(event.page + 1, event.rows);
     },
-
     onSort(event) {
       this.sortField = event.sortField;
       this.sortOrder = event.sortOrder;
-      this.obtenerClientes(1, this.pageSize);
+      this.obtenerServicios(this.currentPage, this.pageSize);
     },
-
-    onFilter() {
-      this.obtenerClientes(1, this.pageSize);
-    },
-
-    aplicarFiltros() {
-      this.obtenerClientes(1, this.pageSize);
-    },
-    reactivarCliente(cliente) {
-      Swal.fire({
-        title: `¿Reactivar a ${cliente.nombre}?`,
-        text: "El cliente volverá a estar activo.",
-        icon: "question",
-        showCancelButton: true,
-        confirmButtonColor: "#28a745",
-        cancelButtonColor: "#6c757d",
-        confirmButtonText: "Sí, reactivar",
-        cancelButtonText: "Cancelar",
-        background: "#18181b",
-        color: "#fff",
-      }).then((result) => {
-        if (result.isConfirmed) {
-          UsuarioService.cambiarEstado(cliente.id, true)
-            .then(() => {
-              Swal.fire({
-                title: "Reactivado",
-                text: `${cliente.nombre} ha sido reactivado.`,
-                icon: "success",
-                timer: 2000,
-                showConfirmButton: false,
-                background: "#18181b",
-                color: "#fff",
-              });
-              this.obtenerClientes(this.currentPage, this.pageSize);
-            })
-            .catch((err) => {
-              console.error("Error al reactivar cliente:", err);
-              Swal.fire({
-                title: "Error",
-                text: "No se pudo reactivar el cliente.",
-                icon: "error",
-                background: "#18181b",
-                color: "#fff",
-                confirmButtonColor: "#e74c3c",
-              });
-            });
-        }
-      });
+    onFilter(event) {
+      this.obtenerServicios(1, this.pageSize);
     },
   },
 };
@@ -546,7 +454,7 @@ export default {
 /* ===========================
    CONTENEDOR GENERAL
 =========================== */
-.clientes-container {
+.servicios-container {
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
@@ -586,7 +494,7 @@ export default {
   border-color: transparent !important;
 }
 
-.boton-nuevo-cliente {
+.boton-nuevo-servicio {
   background-color: #28a745;
   color: white;
   font-weight: normal;
@@ -831,7 +739,7 @@ export default {
   transform: scale(1.2);
   color: #28a745;
 }
-.total-clientes {
+.total-servicios {
   margin-top: 1.9rem;
   font-size: 1rem;
   font-weight: 500;
