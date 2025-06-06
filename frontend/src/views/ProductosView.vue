@@ -584,18 +584,18 @@ export default {
   gap: 0.1rem !important;
 }
 
-:deep(.p-datatable-thead > tr > th:nth-child(4)) /* Estado */ {
+:deep(.p-datatable-thead > tr > th:nth-child(5)) /* Estado */ {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
 }
 
-:deep(.p-datatable-thead > tr > th:nth-child(5)) /* Acciones */ {
+:deep(.p-datatable-thead > tr > th:nth-child(6)) /* Acciones */ {
   text-align: center !important;
   vertical-align: middle !important;
 }
 
-:deep(.p-datatable-thead > tr > th:nth-child(5) .p-column-header-content) {
+:deep(.p-datatable-thead > tr > th:nth-child(6) .p-column-header-content) {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;

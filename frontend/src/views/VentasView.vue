@@ -71,6 +71,11 @@
               />
             </template>
           </Column>
+          <Column field="montoPagado" header="Monto Total" sortable>
+            <template #body="slotProps">
+              ${{ slotProps.data.montoPagado?.toFixed(2) || "0.00" }}
+            </template>
+          </Column>
 
           <Column field="estado" header="Estado">
             <template #body="slotProps">
@@ -93,6 +98,11 @@
               />
             </template>
           </Column>
+          <Column field="montoPagado" header="Pagado" sortable>
+            <template #body="slotProps">
+              ${{ slotProps.data.montoPagado?.toFixed(2) || 0 }}
+            </template>
+          </Column>
 
           <Column header="Acciones" style="min-width: 180px">
             <template #body="slotProps">
@@ -113,23 +123,27 @@
                   v-tooltip.bottom="'Editar venta'"
                   @click="editarVenta(slotProps.data)"
                 />
+                <!-- Botón pagar si está pendiente, ícono check si ya está pagada -->
                 <Button
-                  :icon="
-                    slotProps.data.estado ? 'pi pi-trash' : 'pi pi-refresh'
-                  "
-                  :severity="slotProps.data.estado ? 'danger' : 'success'"
+                  v-if="!slotProps.data.estado"
+                  icon="pi pi-dollar"
+                  severity="success"
                   text
                   rounded
-                  :label="slotProps.data.estado ? '' : ''"
-                  :v-tooltip.bottom="
-                    slotProps.data.estado ? 'Anular venta' : 'Reactivar venta'
-                  "
-                  @click="
-                    slotProps.data.estado
-                      ? anularVenta(slotProps.data)
-                      : reactivarVenta(slotProps.data)
-                  "
+                  v-tooltip.bottom="'Pagar venta'"
+                  @click="pagarDialog(slotProps.data)"
                 />
+
+                <span
+                  v-else
+                  class="icono-check"
+                  v-tooltip.bottom="'Venta pagada'"
+                >
+                  <i
+                    class="pi pi-check"
+                    style="color: #27ae60; font-size: 1.2rem"
+                  ></i>
+                </span>
               </div>
             </template>
           </Column>
@@ -150,12 +164,12 @@
       :closeOnEscape="false"
       :closeOnBackdropClick="false"
       :closable="false"
-      style="width: 450px"
+      style="width: 700px"
     >
       <VentaForm
         :venta="ventaSeleccionada"
         @guardar="guardarVenta($event)"
-        @cerrar="cerrarModal"
+        @cancelar="cerrarModal"
       />
     </Dialog>
 
@@ -167,7 +181,15 @@
       :closable="false"
       style="width: 450px"
     >
+      <!-- Mensaje de carga o error -->
+      <div v-if="!ventaSeleccionada" class="mensaje-carga">
+        <i class="pi pi-spin pi-spinner" style="font-size: 1.5rem"></i>
+        <span>Cargando detalle...</span>
+      </div>
+
+      <!-- Mostrar componente solo si ventaSeleccionada tiene datos -->
       <VentaDetalle
+        v-else
         :venta="ventaSeleccionada"
         @cerrar="mostrarDetalleModal = false"
       />
@@ -231,10 +253,25 @@ export default {
   methods: {
     async obtenerVentas(page = 1, pageSize = 10) {
       this.loading = true;
-
       try {
         const res = await VentaService.getVentas(page, pageSize);
-        this.ventas = res.data.detalles || res.data;
+
+        // Transformamos cada venta para que tenga los campos que espera la tabla
+        this.ventas = res.data.ventas.map((venta) => {
+          const pagos = venta.pagos || [];
+          const montoPagado = pagos.reduce((acc, p) => acc + p.monto, 0);
+
+          return {
+            cliente: venta.clienteNombre,
+            producto: venta.detalles.map((d) => d.nombreProducto).join(", "),
+            fecha: new Date(venta.fechaAtencion).toLocaleDateString(),
+            estado: montoPagado >= venta.totalVenta,
+            id: venta.atencionId,
+            totalVenta: venta.totalVenta,
+            montoPagado,
+          };
+        });
+
         this.totalVentas = res.data.pagination?.total || this.ventas.length;
         this.currentPage = page;
         this.pageSize = pageSize;
@@ -247,6 +284,61 @@ export default {
       }
     },
 
+    pagarDialog(venta) {
+      Swal.fire({
+        title: `Registrar pago de $${venta.totalVenta}?`,
+        input: "select",
+        inputOptions: {
+          Efectivo: "Efectivo",
+          "Transferencia - Mercado Pago": "Transferencia - Mercado Pago",
+          "Transferencia - NaranjaX": "Transferencia - NaranjaX",
+        },
+        inputPlaceholder: "Seleccione método de pago",
+        showCancelButton: true,
+        confirmButtonText: "Registrar Pago",
+        cancelButtonText: "Cancelar",
+        background: "#18181b",
+        color: "#fff",
+      }).then((result) => {
+        if (result.isConfirmed && result.value) {
+          const nuevoPago = {
+            atencionId: venta.id,
+            metodoPago: result.value,
+            monto: venta.totalVenta,
+            fecha: new Date().toISOString(),
+          };
+
+          VentaService.RegistrarPago(nuevoPago)
+            .then(() => {
+              Swal.fire({
+                icon: "success",
+                title: "Pago registrado",
+                text: `Método: ${result.value}`,
+                background: "#18181b",
+                color: "#fff",
+                timer: 2000,
+                showConfirmButton: false,
+              });
+
+              // Esperamos 500ms para dar tiempo al backend a actualizar datos
+              setTimeout(() => {
+                this.obtenerVentas(this.currentPage, this.pageSize);
+              }, 500);
+            })
+
+            .catch((error) => {
+              console.error("Error al registrar el pago:", error);
+              Swal.fire({
+                icon: "error",
+                title: "Error",
+                text: "No se pudo registrar el pago.",
+                background: "#18181b",
+                color: "#fff",
+              });
+            });
+        }
+      });
+    },
     onPageChange(event) {
       this.obtenerVentas(event.page + 1, event.rows);
     },
@@ -262,6 +354,8 @@ export default {
     },
 
     crearVenta() {
+      console.log("Click en Nueva Venta");
+
       this.ventaSeleccionada = null;
       this.mostrarModal = true;
       document.body.classList.add("modal-open");
@@ -279,9 +373,36 @@ export default {
     },
 
     verDetalles(venta) {
-      VentaService.getVentaById(venta.id)
+      const atencionId = venta.id; // <- corregido aquí
+
+      if (!atencionId) {
+        Swal.fire("Error", "ID de venta no encontrado.", "error");
+        return;
+      }
+
+      VentaService.getVentaById(atencionId)
         .then((res) => {
-          this.ventaSeleccionada = res.data.venta || res.data;
+          const data = res.data.venta;
+
+          this.ventaSeleccionada = {
+            ClienteNombre: data.clienteNombre,
+            FechaAtencion: data.fechaAtencion,
+            Detalles: data.detalles.map((d) => ({
+              NombreProducto: d.nombreProducto,
+              Cantidad: d.cantidad,
+              PrecioUnitario: d.precioUnitario,
+              Subtotal: d.subtotal,
+            })),
+            TotalVenta: data.totalVenta,
+            Pago: data.pago
+              ? {
+                  MetodoPago: data.pago.metodoPago,
+                  Monto: data.pago.monto,
+                }
+              : null,
+            AtencionId: atencionId, // <- necesario si usas router-link para editar
+          };
+
           this.mostrarDetalleModal = true;
         })
         .catch(() => {
@@ -292,7 +413,6 @@ export default {
           );
         });
     },
-
     async guardarVenta(ventaActualizada) {
       this.cerrarModal();
 
@@ -367,7 +487,6 @@ export default {
         color: "#fff",
       }).then((result) => {
         if (result.isConfirmed) {
-          // Aquí podrías usar: VentaService.anularVenta(venta.id);
           Swal.fire({
             title: "Anulada",
             text: "La venta ha sido anulada.",
@@ -395,7 +514,6 @@ export default {
         color: "#fff",
       }).then((result) => {
         if (result.isConfirmed) {
-          // Aquí podrías usar: VentaService.reactivarVenta(venta.id);
           Swal.fire({
             title: "Reactivada",
             text: "La venta ha sido reactivada.",
@@ -516,18 +634,18 @@ export default {
   gap: 0.1rem !important;
 }
 
-:deep(.p-datatable-thead > tr > th:nth-child(4)) /* Estado */ {
+:deep(.p-datatable-thead > tr > th:nth-child(5)) /* Estado */ {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
 }
 
-:deep(.p-datatable-thead > tr > th:nth-child(5)) /* Acciones */ {
+:deep(.p-datatable-thead > tr > th:nth-child(7)) /* Acciones */ {
   text-align: center !important;
   vertical-align: middle !important;
 }
 
-:deep(.p-datatable-thead > tr > th:nth-child(5) .p-column-header-content) {
+:deep(.p-datatable-thead > tr > th:nth-child(7) .p-column-header-content) {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -655,9 +773,22 @@ export default {
 /* ===========================
    TAGS DE ESTADO (ACTIVO / INACTIVO)
 =========================== */
+:deep(.p-tag) {
+  border-radius: 12px !important;
+  padding: 0.2rem 0.6rem !important;
+  font-weight: 600;
+}
+
 :deep(.p-tag-success) {
   background-color: #27ae60 !important;
   color: #e0f2f1 !important;
+  font-weight: 600;
+  border-radius: 12px !important;
+  padding: 0.2rem 0.6rem !important;
+}
+:deep(.p-tag-warning) {
+  background-color: #f0ad4e !important;
+  color: #000000 !important;
   font-weight: 600;
   border-radius: 12px !important;
   padding: 0.2rem 0.6rem !important;
@@ -709,5 +840,11 @@ export default {
   font-weight: 500;
   text-align: left;
   color: #aeaeae;
+}
+.icono-check {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 30px;
 }
 </style>

@@ -32,7 +32,7 @@ namespace backend.Controllers
             int? cantidad = null
         )
         {
-            var query = _context.ProductosServicios.Where(p => p.EsAlmacenable == true);
+            var query = _context.ProductosServicios.Where(p => p.Activo && p.EsAlmacenable == true);
 
             // Filtros seguros
             if (!string.IsNullOrEmpty(nombre))
@@ -145,7 +145,9 @@ namespace backend.Controllers
             string? order = null
         )
         {
-            var query = _context.ProductosServicios.Where(p => !(p.EsAlmacenable ?? false));
+            var query = _context.ProductosServicios.Where(p =>
+                p.Activo && !(p.EsAlmacenable ?? false)
+            );
 
             // Aplicar ordenamiento
             switch (sort?.ToLower())
@@ -221,12 +223,72 @@ namespace backend.Controllers
             );
         }
 
+        // GET: api/productosservicios/venta?nombre=a
+        [HttpGet("venta")]
+        [Authorize(Roles = "Administrador,Barbero")]
+        public IActionResult GetParaVenta(
+            int page = 1,
+            int pageSize = 10,
+            [FromQuery] string? nombre = null
+        )
+        {
+            // Verificar si _context o _context.ProductosServicios son null
+            if (_context == null || _context.ProductosServicios == null)
+            {
+                return NotFound("No se encontraron productos o servicios.");
+            }
+
+            var query = _context.ProductosServicios.Where(p => p.Activo);
+
+            if (!string.IsNullOrEmpty(nombre))
+            {
+                query = query.Where(p =>
+                    EF.Functions.Like((p.Nombre ?? "").ToLower(), $"%{nombre.ToLower()}%")
+                );
+            }
+
+            var total = query.Count();
+
+            var items = query
+                .OrderBy(p => p.Nombre)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(p => new ProductoServicioVentaDto
+                {
+                    Id = p.Id,
+                    Nombre = p.Nombre ?? "Desconocido", // Valor por defecto
+                    Precio = p.Precio ?? 0m, // Valor por defecto
+                    EsAlmacenable = p.EsAlmacenable ?? false, // Valor por defecto
+                })
+                .ToList();
+
+            return Ok(
+                new
+                {
+                    status = 200,
+                    message = total > 0
+                        ? "Lista obtenida correctamente."
+                        : "No hay productos ni servicios.",
+                    pagination = new
+                    {
+                        totalPages = (int)Math.Ceiling((double)total / pageSize),
+                        currentPage = page,
+                        pageSize,
+                        total,
+                    },
+                    productos = items,
+                }
+            );
+        }
+
         // GET: api/productosservicios/{id}
         [HttpGet("{id}")]
         [Authorize(Roles = "Administrador,Barbero")]
         public async Task<IActionResult> GetProductoServicio(int id)
         {
-            var productoServicio = await _context.ProductosServicios.FindAsync(id);
+            var productoServicio = await _context
+                .ProductosServicios.Where(p => p.Activo && p.Id == id)
+                .FirstOrDefaultAsync();
             if (productoServicio == null)
             {
                 return NotFound(
@@ -355,21 +417,21 @@ namespace backend.Controllers
                 );
             }
 
-            // Actualizar campos
+            // Actualizar campos del producto o servicio
             productoServicio.Nombre = dto.Nombre;
             productoServicio.Descripcion = dto.Descripcion;
             productoServicio.Precio = dto.Precio;
             productoServicio.EsAlmacenable = dto.EsAlmacenable;
             productoServicio.Cantidad = dto.Cantidad;
 
-            // Manejo de imagen
+            // Buscar imagen activa actual (si existe)
+            var imagenExistente = _context.Imagen.FirstOrDefault(i =>
+                i.TipoImagen == "ProductoServicio" && i.IdRelacionado == id && i.Activo == true
+            );
+
+            // SUBIÓ UNA NUEVA IMAGEN
             if (dto.Imagen != null && dto.Imagen.Length > 0)
             {
-                // Buscar imagen existente en DB
-                var imagenExistente = _context.Imagen.FirstOrDefault(i =>
-                    i.TipoImagen == "ProductoServicio" && i.IdRelacionado == id && i.Activo == true
-                );
-
                 string baseFolder =
                     (productoServicio.EsAlmacenable ?? false) ? "productos" : "servicios";
                 var carpetaPath = Path.Combine(
@@ -379,10 +441,21 @@ namespace backend.Controllers
                     baseFolder,
                     id.ToString()
                 );
+                Directory.CreateDirectory(carpetaPath);
+
+                // Generar nuevo nombre de archivo
+                var fileName = $"{Guid.NewGuid()}{Path.GetExtension(dto.Imagen.FileName)}";
+                var fullPath = Path.Combine(carpetaPath, fileName);
+
+                // Guardar imagen nueva en disco
+                using (var stream = new FileStream(fullPath, FileMode.Create))
+                {
+                    await dto.Imagen.CopyToAsync(stream);
+                }
 
                 if (imagenExistente != null)
                 {
-                    // Borrar archivo físico anterior
+                    // Eliminar imagen anterior físicamente si existe
                     var rutaFisicaAnterior = Path.Combine(
                         Directory.GetCurrentDirectory(),
                         "wwwroot",
@@ -395,33 +468,14 @@ namespace backend.Controllers
                         System.IO.File.Delete(rutaFisicaAnterior);
                     }
 
-                    // Actualizar ruta imagen
-                    var fileName = $"{Guid.NewGuid()}{Path.GetExtension(dto.Imagen.FileName)}";
-                    var fullPath = Path.Combine(carpetaPath, fileName);
-                    Directory.CreateDirectory(carpetaPath);
-
-                    using (var stream = new FileStream(fullPath, FileMode.Create))
-                    {
-                        await dto.Imagen.CopyToAsync(stream);
-                    }
-
+                    // Actualizar imagen en DB
                     imagenExistente.Ruta = $"/images/{baseFolder}/{id}/{fileName}";
                     imagenExistente.FechaCreacion = DateTime.UtcNow;
                     _context.Imagen.Update(imagenExistente);
                 }
                 else
                 {
-                    // No había imagen previa: crear carpeta y guardar
-                    Directory.CreateDirectory(carpetaPath);
-
-                    var fileName = $"{Guid.NewGuid()}{Path.GetExtension(dto.Imagen.FileName)}";
-                    var fullPath = Path.Combine(carpetaPath, fileName);
-
-                    using (var stream = new FileStream(fullPath, FileMode.Create))
-                    {
-                        await dto.Imagen.CopyToAsync(stream);
-                    }
-
+                    // Crear nueva imagen en DB
                     var nuevaImagen = new Imagen
                     {
                         Ruta = $"/images/{baseFolder}/{id}/{fileName}",
@@ -430,8 +484,40 @@ namespace backend.Controllers
                         Activo = true,
                         FechaCreacion = DateTime.UtcNow,
                     };
-
                     _context.Imagen.Add(nuevaImagen);
+                }
+            }
+
+            // ELIMINÓ LA IMAGEN SIN SUBIR UNA NUEVA
+            if (dto.EliminarImagen == true && imagenExistente != null)
+            {
+                var rutaFisicaOriginal = Path.Combine(
+                    Directory.GetCurrentDirectory(),
+                    "wwwroot",
+                    imagenExistente.Ruta.TrimStart('/').Replace('/', Path.DirectorySeparatorChar)
+                );
+
+                if (System.IO.File.Exists(rutaFisicaOriginal))
+                {
+                    var rutaRelativaTrash = imagenExistente.Ruta.Replace("/images/", "/trash/");
+                    var rutaFisicaTrash = Path.Combine(
+                        Directory.GetCurrentDirectory(),
+                        "wwwroot",
+                        rutaRelativaTrash.TrimStart('/').Replace('/', Path.DirectorySeparatorChar)
+                    );
+
+                    var carpetaTrash = Path.GetDirectoryName(rutaFisicaTrash);
+                    if (!string.IsNullOrEmpty(carpetaTrash) && !Directory.Exists(carpetaTrash))
+                    {
+                        Directory.CreateDirectory(carpetaTrash);
+                    }
+
+                    System.IO.File.Move(rutaFisicaOriginal, rutaFisicaTrash);
+
+                    imagenExistente.Ruta = rutaRelativaTrash;
+                    imagenExistente.Activo = false;
+
+                    _context.Imagen.Update(imagenExistente);
                 }
             }
 
@@ -450,7 +536,6 @@ namespace backend.Controllers
 
         // DELETE: api/productosservicios/{id}
         [HttpDelete("{id}")]
-        [Authorize(Roles = "Administrador")]
         public async Task<IActionResult> DeleteProductoServicio(int id)
         {
             var productoServicio = await _context.ProductosServicios.FindAsync(id);
@@ -473,63 +558,59 @@ namespace backend.Controllers
                 );
             }
 
-            // Eliminar imagen/es relacionadas y archivos físicos
+            // Cambio lógico en BD
+            productoServicio.Activo = false;
+            _context.ProductosServicios.Update(productoServicio);
+
+            // Mover imágenes a trash y actualizar activo a false
             var imagenes = _context
                 .Imagen.Where(i => i.TipoImagen == "ProductoServicio" && i.IdRelacionado == id)
                 .ToList();
 
             foreach (var imagen in imagenes)
             {
-                var rutaFisica = Path.Combine(
+                var rutaFisicaOriginal = Path.Combine(
                     Directory.GetCurrentDirectory(),
                     "wwwroot",
                     imagen.Ruta.TrimStart('/').Replace('/', Path.DirectorySeparatorChar)
                 );
-                if (System.IO.File.Exists(rutaFisica))
+                if (System.IO.File.Exists(rutaFisicaOriginal))
                 {
-                    System.IO.File.Delete(rutaFisica);
-                }
-                _context.Imagen.Remove(imagen);
-            }
+                    // Crear ruta para trash
+                    var rutaRelativaTrash = imagen.Ruta.Replace("/images/", "/trash/");
+                    var rutaFisicaTrash = Path.Combine(
+                        Directory.GetCurrentDirectory(),
+                        "wwwroot",
+                        rutaRelativaTrash.TrimStart('/').Replace('/', Path.DirectorySeparatorChar)
+                    );
 
-            // Borrar carpeta del producto o servicio
-            string baseFolder =
-                (productoServicio.EsAlmacenable ?? false) ? "productos" : "servicios";
-            var carpetaPath = Path.Combine(
-                Directory.GetCurrentDirectory(),
-                "wwwroot",
-                "images",
-                baseFolder,
-                id.ToString()
-            );
-
-            try
-            {
-                if (Directory.Exists(carpetaPath))
-                {
-                    Directory.Delete(carpetaPath, true); // elimina carpeta y todo su contenido
-                }
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(
-                    500,
-                    new
+                    // Crear carpeta trash si no existe
+                    var carpetaTrash = Path.GetDirectoryName(rutaFisicaTrash);
+                    if (!string.IsNullOrEmpty(carpetaTrash) && !Directory.Exists(carpetaTrash))
                     {
-                        status = 500,
-                        message = $"No se pudo eliminar la carpeta del producto: {ex.Message}",
+                        Directory.CreateDirectory(carpetaTrash);
                     }
-                );
+
+                    // Mover archivo
+                    System.IO.File.Move(rutaFisicaOriginal, rutaFisicaTrash);
+
+                    // Actualizar ruta en BD
+                    imagen.Ruta = rutaRelativaTrash;
+
+                    // Marcar imagen como inactiva (opcional)
+                    imagen.Activo = false;
+
+                    _context.Imagen.Update(imagen);
+                }
             }
 
-            _context.ProductosServicios.Remove(productoServicio);
             await _context.SaveChangesAsync();
 
             return Ok(
                 new
                 {
                     status = 200,
-                    message = "Producto o servicio eliminado correctamente.",
+                    message = "Producto o servicio eliminado lógicamente y sus imágenes movidas a trash.",
                     productoEliminado = productoServicio.Nombre,
                 }
             );
@@ -537,7 +618,6 @@ namespace backend.Controllers
 
         // DELETE: api/productosservicios/imagen/{idImagen}
         [HttpDelete("imagen/{idImagen}")]
-        [Authorize(Roles = "Administrador")]
         public async Task<IActionResult> DeleteImagen(int idImagen)
         {
             var imagen = await _context.Imagen.FindAsync(idImagen);
@@ -546,35 +626,60 @@ namespace backend.Controllers
                 return NotFound(new { status = 404, message = "La imagen no existe." });
             }
 
-            var rutaFisica = Path.Combine(
+            var producto = await _context.ProductosServicios.FindAsync(imagen.IdRelacionado);
+            if (producto == null)
+            {
+                return BadRequest(
+                    new { status = 400, message = "El producto o servicio relacionado no existe." }
+                );
+            }
+
+            // Usa la misma lógica que el método que sí funciona
+            var rutaFisicaOriginal = Path.Combine(
                 Directory.GetCurrentDirectory(),
                 "wwwroot",
                 imagen.Ruta.TrimStart('/').Replace('/', Path.DirectorySeparatorChar)
             );
-            if (System.IO.File.Exists(rutaFisica))
+
+            if (!System.IO.File.Exists(rutaFisicaOriginal))
             {
-                System.IO.File.Delete(rutaFisica);
+                return NotFound(
+                    new { status = 404, message = "El archivo físico de la imagen no existe." }
+                );
             }
 
-            _context.Imagen.Remove(imagen);
+            // Nueva ruta relativa para trash
+            var rutaRelativaTrash = imagen.Ruta.Replace("/images/", "/trash/");
+            var rutaFisicaTrash = Path.Combine(
+                Directory.GetCurrentDirectory(),
+                "wwwroot",
+                rutaRelativaTrash.TrimStart('/').Replace('/', Path.DirectorySeparatorChar)
+            );
+
+            // Crear carpeta trash si no existe
+            var carpetaTrash = Path.GetDirectoryName(rutaFisicaTrash);
+            if (!string.IsNullOrEmpty(carpetaTrash) && !Directory.Exists(carpetaTrash))
+            {
+                Directory.CreateDirectory(carpetaTrash);
+            }
+
+            // Mover archivo
+            System.IO.File.Move(rutaFisicaOriginal, rutaFisicaTrash);
+
+            // Actualizar datos en la base
+            imagen.Ruta = rutaRelativaTrash;
+            imagen.Activo = false;
+
+            _context.Imagen.Update(imagen);
             await _context.SaveChangesAsync();
 
-            // Verificar si la carpeta quedó vacía y eliminarla
-            var carpetaPath = Path.GetDirectoryName(rutaFisica);
-            if (
-                Directory.Exists(carpetaPath)
-                && !Directory.EnumerateFileSystemEntries(carpetaPath).Any()
-            )
-            {
-                Directory.Delete(carpetaPath);
-            }
-
-            return Ok(new { status = 200, message = "Imagen eliminada correctamente." });
+            return Ok(
+                new { status = 200, message = "Imagen movida a trash y desactivada correctamente." }
+            );
         }
 
         // GET: api/productosservicios/{id}/imagen
         [HttpGet("{id}/imagen")]
-        [Authorize(Roles = "Administrador,Barbero")]
         public IActionResult GetImagen(int id)
         {
             var imagen = _context.Imagen.FirstOrDefault(i =>

@@ -17,17 +17,30 @@ apiClient.interceptors.request.use((config) => {
 });
 
 export default {
-  // Obtener lista de ventas
+  // Obtener productos/servicios para venta con paginación y filtro por nombre (para autocompletado)
+  getProductosServiciosVenta(page = 1, pageSize = 10, nombre = "") {
+    console.log("Petición al backend con nombre:", nombre);
+    return apiClient.get("/productosservicios/venta", {
+      params: { page, pageSize, nombre },
+    });
+  },
+
+  // Otros métodos que tengas para ventas, atención, etc, si los necesitas
   getVentas(page = 1, pageSize = 10) {
-    return apiClient.get("/DetalleAtencion", {
+    return apiClient.get("/detalleatencion/ventas", {
       params: { page, pageSize },
     });
   },
 
-  // Obtener una venta por ID (opcional)
-  getVentaById(id) {
-    return apiClient.get(`/detalleatencion/ventas`, {
-      params: { atencionId: id },
-    });
+  getVentaById(atencionId) {
+    return apiClient.get(`/detalleatencion/ventas/${atencionId}`);
+  },
+
+  crearAtencionConDetalles(atencionData) {
+    console.log(JSON.stringify(atencionData, null, 2));
+    return apiClient.post("/atencion", atencionData);
+  },
+  RegistrarPago(pagoData) {
+    return apiClient.post("/pago", pagoData);
   },
 };

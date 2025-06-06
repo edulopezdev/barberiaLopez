@@ -10,11 +10,6 @@
       </div>
 
       <div class="campo">
-        <label><i class="pi pi-paw"></i> Mascota</label>
-        <p>{{ venta?.MascotaNombre || "No aplica" }}</p>
-      </div>
-
-      <div class="campo">
         <label><i class="pi pi-calendar"></i> Fecha de Atención</label>
         <p>{{ formatearFecha(venta?.FechaAtencion) }}</p>
       </div>

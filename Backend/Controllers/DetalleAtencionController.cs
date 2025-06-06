@@ -74,28 +74,38 @@ namespace backend.Controllers
             );
         }
 
+        // GET: api/detalleatencion/ventas
         [HttpGet("ventas")]
         public async Task<IActionResult> GetVentas(int page = 1, int pageSize = 10)
         {
             var query = _context
                 .Atencion.Include(a => a.Cliente)
-                .ThenInclude(u => u.Rol)
+                .ThenInclude(c => c.Rol)
                 .Include(a => a.DetalleAtencion)
                 .ThenInclude(d => d.ProductoServicio)
                 .Where(a => a.DetalleAtencion.Any());
 
             var totalVentas = await query.CountAsync();
 
-            var ventasEnMemoria = query
+            var atenciones = await query
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
-                .AsEnumerable()
+                .AsNoTracking()
+                .ToListAsync();
+
+            var atencionIds = atenciones.Select(a => a.Id).ToList();
+
+            var pagos = await _context
+                .Pagos.Where(p => atencionIds.Contains(p.AtencionId))
+                .AsNoTracking()
+                .ToListAsync();
+
+            var ventas = atenciones
                 .Select(a => new VentaDto
                 {
                     AtencionId = a.Id,
                     ClienteNombre = a.Cliente?.Nombre ?? "Cliente Desconocido",
                     FechaAtencion = a.Fecha,
-
                     Detalles = a
                         .DetalleAtencion.Select(d => new DetalleVentaDto
                         {
@@ -107,16 +117,16 @@ namespace backend.Controllers
                         })
                         .ToList(),
 
-                    Pago =
-                        a.Pago != null
-                            ? new PagoInfoDto
-                            {
-                                PagoId = a.Pago.Id,
-                                MetodoPago = a.Pago.MetodoPago,
-                                Monto = a.Pago.Monto,
-                                FechaPago = a.Pago.Fecha,
-                            }
-                            : null,
+                    Pagos = pagos
+                        .Where(p => p.AtencionId == a.Id)
+                        .Select(p => new PagoInfoDto
+                        {
+                            PagoId = p.Id,
+                            MetodoPago = p.MetodoPago.ToString(),
+                            Monto = p.Monto,
+                            FechaPago = p.Fecha,
+                        })
+                        .ToList(),
                 })
                 .ToList();
 
@@ -125,16 +135,76 @@ namespace backend.Controllers
                 {
                     status = 200,
                     message = totalVentas > 0
-                        ? "Lista de ventas obtenida correctamente."
+                        ? "Ventas obtenidas correctamente."
                         : "No hay ventas registradas.",
                     pagination = new
                     {
-                        totalVentas = totalVentas,
                         totalPages = (int)Math.Ceiling((double)totalVentas / pageSize),
                         currentPage = page,
                         pageSize,
+                        total = totalVentas,
                     },
-                    ventas = ventasEnMemoria,
+                    ventas = ventas,
+                }
+            );
+        }
+
+        // GET: api/detalleatencion/ventas/{id}
+        [HttpGet("ventas/{id}")]
+        public async Task<IActionResult> GetVentaById(int id)
+        {
+            var atencion = await _context
+                .Atencion.Include(a => a.Cliente)
+                .Include(a => a.DetalleAtencion)
+                .ThenInclude(d => d.ProductoServicio)
+                .FirstOrDefaultAsync(a => a.Id == id);
+
+            if (atencion == null)
+            {
+                return NotFound(
+                    new
+                    {
+                        status = 404,
+                        error = "Not Found",
+                        message = "La atención no existe.",
+                    }
+                );
+            }
+
+            var pago = await _context.Pagos.FirstOrDefaultAsync(p => p.AtencionId == id);
+
+            var venta = new VentaDto
+            {
+                AtencionId = atencion.Id,
+                ClienteNombre = atencion.Cliente?.Nombre ?? "Cliente Desconocido",
+                FechaAtencion = atencion.Fecha,
+                Detalles = atencion
+                    .DetalleAtencion.Select(d => new DetalleVentaDto
+                    {
+                        ProductoServicioId = d.ProductoServicioId,
+                        NombreProducto = d.ProductoServicio?.Nombre ?? "Producto/Servicio borrado",
+                        Cantidad = d.Cantidad,
+                        PrecioUnitario = d.PrecioUnitario,
+                    })
+                    .ToList(),
+                Pagos = await _context
+                    .Pagos.Where(p => p.AtencionId == id)
+                    .Select(p => new PagoInfoDto
+                    {
+                        PagoId = p.Id,
+                        MetodoPago = p.MetodoPago.ToString(),
+                        Monto = p.Monto,
+                        FechaPago = p.Fecha,
+                    })
+                    .ToListAsync(),
+            };
+
+            return Ok(
+                new
+                {
+                    status = 200,
+                    message = "Venta encontrada.",
+                    venta,
                 }
             );
         }

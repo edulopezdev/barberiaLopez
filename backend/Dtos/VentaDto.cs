@@ -9,7 +9,16 @@ namespace backend.Dtos
         public List<DetalleVentaDto> Detalles { get; set; } = new();
         public decimal TotalVenta => Detalles.Sum(d => d.Subtotal);
 
-        public PagoInfoDto? Pago { get; set; }
+        public List<PagoInfoDto> Pagos { get; set; } = new();
+
+        // Monto total pagado (suma de todos los pagos)
+        public decimal MontoPagado => Pagos?.Sum(p => p.Monto) ?? 0;
+
+        // Estado del pago basado en los pagos existentes
+        public string EstadoPago =>
+            Pagos == null || !Pagos.Any() ? "Sin pago"
+            : MontoPagado < TotalVenta ? "Incompleto"
+            : "Completo";
     }
 
     public class DetalleVentaDto
@@ -24,8 +33,14 @@ namespace backend.Dtos
     public class PagoInfoDto
     {
         public int PagoId { get; set; }
-        public MetodoPago MetodoPago { get; set; }
+        public string MetodoPago { get; set; } = string.Empty;
         public decimal Monto { get; set; }
         public DateTime FechaPago { get; set; }
+    }
+
+    public class MetodoPagoDetalleDto
+    {
+        public MetodoPago MetodoPago { get; set; }
+        public decimal Monto { get; set; }
     }
 }

@@ -18,6 +18,11 @@ export default {
   // === PRODUCTOS (EsAlmacenable = true)
   // ==============================
   getProductos(page = 1, pageSize = 10, filtros = {}) {
+    console.log("[ProductoServicioService] getProductos", {
+      page,
+      pageSize,
+      filtros,
+    });
     const params = new URLSearchParams();
     params.append("page", page);
     params.append("pageSize", pageSize);
@@ -26,7 +31,21 @@ export default {
         params.append(key, value);
       }
     });
-    return apiClient.get(`/productosservicios/almacenables?${params.toString()}`);
+    return apiClient.get(
+      `/productosservicios/almacenables?${params.toString()}`
+    );
+  },
+  getProductosYServiciosParaVenta(page = 1, pageSize = 10, filtros = {}) {
+    const params = new URLSearchParams();
+    params.append("page", page);
+    params.append("pageSize", pageSize);
+    Object.entries(filtros).forEach(([key, value]) => {
+      if (value !== null && value !== undefined && value !== "") {
+        params.append(key, value);
+      }
+    });
+
+    return apiClient.get(`/productosservicios/venta?${params.toString()}`);
   },
 
   getProducto(id) {
@@ -49,6 +68,11 @@ export default {
   // === SERVICIOS (EsAlmacenable = false)
   // ==============================
   getServicios(page = 1, pageSize = 10, filtros = {}) {
+    console.log("[ProductoServicioService] getServicios", {
+      page,
+      pageSize,
+      filtros,
+    });
     const params = new URLSearchParams();
     params.append("page", page);
     params.append("pageSize", pageSize);
@@ -57,7 +81,9 @@ export default {
         params.append(key, value);
       }
     });
-    return apiClient.get(`/productosservicios/noAlmacenables?${params.toString()}`);
+    return apiClient.get(
+      `/productosservicios/noAlmacenables?${params.toString()}`
+    );
   },
 
   getServicio(id) {

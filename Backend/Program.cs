@@ -18,6 +18,11 @@ using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Configuración explícita de logging a consola
+builder.Logging.ClearProviders(); // Limpia los proveedores existentes (opcional)
+builder.Logging.AddConsole(); // Asegura logs en consola
+builder.Logging.SetMinimumLevel(LogLevel.Information); // Nivel mínimo de logs
+
 // Servicios
 
 // Configurar CORS antes de construir la aplicación

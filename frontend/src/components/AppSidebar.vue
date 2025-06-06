@@ -42,12 +42,12 @@ export default {
           icon: "pi pi-users",
           rolesAllowed: ["Administrador", "Barbero"],
         },
-        {
-          label: "Turnos",
-          route: "/turnos",
-          icon: "pi pi-calendar",
-          rolesAllowed: ["Administrador", "Barbero"],
-        },
+        // {
+        //   label: "Turnos",
+        //   route: "/turnos",
+        //   icon: "pi pi-calendar",
+        //   rolesAllowed: ["Administrador", "Barbero"],
+        // },
         {
           label: "Productos",
           route: "/productos",

@@ -11,26 +11,23 @@ namespace backend.Models
         public int Id { get; set; }
 
         [Required]
-        public int ClienteId { get; set; } // Clave foránea (Usuario)
+        public int ClienteId { get; set; }
 
         [Required]
-        public int BarberoId { get; set; } // Clave foránea (Usuario)
+        public int BarberoId { get; set; }
 
         [Required]
-        public DateTime Fecha { get; set; } // Fecha de la atención
+        public DateTime Fecha { get; set; }
 
         [Required]
         [Range(0, 10000)]
-        public decimal Total { get; set; } // Monto total de la atención
+        public decimal Total { get; set; }
 
-        public int? TurnoId { get; set; } // Relación opcional con Turno (puede ser NULL)
+        public int? TurnoId { get; set; }
 
-        // Propiedad de navegación
         public Usuario Cliente { get; set; } = null!;
         public Usuario Barbero { get; set; } = null!;
         public ICollection<DetalleAtencion> DetalleAtencion { get; set; } =
             new List<DetalleAtencion>();
-        public int? PagoId { get; set; }
-        public Pago? Pago { get; set; }
     }
 }

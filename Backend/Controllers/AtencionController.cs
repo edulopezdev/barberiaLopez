@@ -1,4 +1,6 @@
+using System.Security.Claims;
 using backend.Data;
+using backend.Dtos;
 using backend.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -50,7 +52,13 @@ namespace backend.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetAtencion(int id)
         {
-            var atencion = await _context.Atencion.FindAsync(id);
+            var atencion = await _context
+                .Atencion.Include(a => a.Cliente) // Carga Cliente relacionado
+                .Include(a => a.Barbero) // Carga Barbero relacionado
+                .Include(a => a.DetalleAtencion) // Carga detalles de atención
+                .ThenInclude(d => d.ProductoServicio) // Carga ProductoServicio en cada detalle
+                .FirstOrDefaultAsync(a => a.Id == id);
+
             if (atencion == null)
             {
                 return NotFound(
@@ -75,33 +83,151 @@ namespace backend.Controllers
 
         // POST: api/atencion (Registrar una nueva atención)
         [HttpPost]
-        public async Task<IActionResult> PostAtencion(Atencion atencion)
+        public async Task<IActionResult> PostAtencion([FromBody] CrearAtencionDto dto)
         {
-            if (atencion.Fecha == default)
+            if (!ModelState.IsValid)
             {
                 return BadRequest(
                     new
                     {
                         status = 400,
                         error = "Bad Request",
-                        message = "La fecha de la atención es obligatoria.",
+                        message = "Errores de validación",
+                        details = ModelState
+                            .Values.SelectMany(v => v.Errors)
+                            .Select(e => e.ErrorMessage),
                     }
                 );
             }
 
-            _context.Atencion.Add(atencion);
-            await _context.SaveChangesAsync();
+            var barberoIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (
+                string.IsNullOrEmpty(barberoIdStr) || !int.TryParse(barberoIdStr, out int barberoId)
+            )
+                return Unauthorized(
+                    new
+                    {
+                        status = 401,
+                        error = "Unauthorized",
+                        message = "Usuario no autenticado.",
+                    }
+                );
 
-            return CreatedAtAction(
-                nameof(GetAtencion),
-                new { id = atencion.Id },
-                new
-                {
-                    status = 201,
-                    message = "Atención registrada correctamente.",
-                    atencion,
-                }
-            );
+            // Validar cliente
+            var clienteExiste = await _context.Usuario.AnyAsync(u => u.Id == dto.ClienteId);
+            if (!clienteExiste)
+                return BadRequest(
+                    new
+                    {
+                        status = 400,
+                        error = "Bad Request",
+                        message = $"ClienteId {dto.ClienteId} no existe.",
+                    }
+                );
+
+            // Validar total
+            if (dto.Total < 0)
+                return BadRequest(
+                    new
+                    {
+                        status = 400,
+                        error = "Bad Request",
+                        message = "El total debe ser un valor positivo.",
+                    }
+                );
+
+            // Validar detalles
+            if (dto.Detalles == null || !dto.Detalles.Any())
+                return BadRequest(
+                    new
+                    {
+                        status = 400,
+                        error = "Bad Request",
+                        message = "La atención debe contener al menos un detalle.",
+                    }
+                );
+
+            foreach (var detalle in dto.Detalles)
+            {
+                if (detalle.Cantidad <= 0)
+                    return BadRequest(
+                        new
+                        {
+                            status = 400,
+                            error = "Bad Request",
+                            message = "La cantidad en los detalles debe ser mayor que cero.",
+                        }
+                    );
+
+                if (detalle.PrecioUnitario < 0)
+                    return BadRequest(
+                        new
+                        {
+                            status = 400,
+                            error = "Bad Request",
+                            message = "El precio unitario en los detalles debe ser positivo.",
+                        }
+                    );
+
+                var productoExiste = await _context.ProductosServicios.AnyAsync(p =>
+                    p.Id == detalle.ProductoServicioId
+                );
+                if (!productoExiste)
+                    return BadRequest(
+                        new
+                        {
+                            status = 400,
+                            error = "Bad Request",
+                            message = $"ProductoServicioId {detalle.ProductoServicioId} no existe.",
+                        }
+                    );
+            }
+
+            var atencion = new Atencion
+            {
+                ClienteId = dto.ClienteId,
+                BarberoId = barberoId,
+                Fecha = dto.Fecha ?? DateTime.Now,
+                Total = dto.Total,
+                DetalleAtencion = dto
+                    .Detalles.Select(d => new DetalleAtencion
+                    {
+                        ProductoServicioId = d.ProductoServicioId,
+                        Cantidad = d.Cantidad,
+                        PrecioUnitario = d.PrecioUnitario,
+                    })
+                    .ToList(),
+            };
+
+            try
+            {
+                _context.Atencion.Add(atencion);
+                await _context.SaveChangesAsync();
+
+                return CreatedAtAction(
+                    nameof(GetAtencion),
+                    new { id = atencion.Id },
+                    new
+                    {
+                        status = 201,
+                        message = "Atención registrada correctamente.",
+                        atencion,
+                    }
+                );
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(
+                    500,
+                    new
+                    {
+                        status = 500,
+                        error = "Internal Server Error",
+                        message = "Ocurrió un error al guardar la atención.",
+                        details = ex.Message,
+                    }
+                );
+            }
         }
 
         // PUT: api/atencion/{id} (Actualizar datos de una atención)

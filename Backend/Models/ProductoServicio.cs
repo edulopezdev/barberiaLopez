@@ -10,6 +10,7 @@ namespace backend.Models
         [Required]
         [MaxLength(100)]
         public string? Nombre { get; set; } // Nombre del producto o servicio
+        public bool Activo { get; set; } = true; // Indica si el producto o servicio est· activo
 
         public string? Descripcion { get; set; } // Descripción opcional (permite NULL)
 

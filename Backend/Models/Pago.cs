@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using backend.Models; // Asegúrate de que Atencion esté en el mismo namespace
+using System.Linq; // ✅ Necesario para usar .Sum()
+using backend.Models;
 
 public enum MetodoPago
 {
@@ -21,8 +23,8 @@ public class Pago
     public int Id { get; set; }
 
     [Required]
-    [ForeignKey("Atencion")] // Asegúrate de que el nombre del ForeignKey sea el correcto
-    public int AtencionId { get; set; } // El ID de la atención, no la entidad completa
+    [ForeignKey("Atencion")]
+    public int AtencionId { get; set; }
 
     [Required]
     public MetodoPago MetodoPago { get; set; }
@@ -34,6 +36,10 @@ public class Pago
     [Required]
     public DateTime Fecha { get; set; } = DateTime.Now;
 
-    // Relación con la tabla Atencion, que puede ser opcional al momento de hacer el POST
     public virtual Atencion? Atencion { get; set; }
+
+    public List<MetodoPagoDetalle> Metodos { get; set; } = new();
+
+    [NotMapped]
+    public decimal MontoTotal => Metodos?.Sum(m => m.Monto) ?? 0;
 }
