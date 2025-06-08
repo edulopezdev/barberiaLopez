@@ -1,6 +1,6 @@
 <template>
   <div class="formulario-venta" v-if="formularioVisible">
-    <!-- Título y botón de cierre -->
+    <!-- Título -->
     <h3>{{ ventaId ? "Editar Atención" : "Nueva Atención" }}</h3>
 
     <!-- Selección de Cliente -->
@@ -15,6 +15,7 @@
         @complete="buscarClientes"
         placeholder="Selecciona un cliente"
         :force-selection="true"
+        class="auto-complete-fullwidth"
       />
       <div v-if="errores.cliente" class="error-msg">
         <i class="pi pi-exclamation-triangle"></i> {{ errores.cliente }}
@@ -44,8 +45,8 @@
       </div>
     </div>
 
-    <!-- Carrito -->
-    <div class="carrito" v-if="carrito.length > 0">
+    <!-- Carrito (tabla siempre visible) -->
+    <div class="carrito">
       <h4>Productos Seleccionados</h4>
       <table class="tabla-carrito">
         <thead>
@@ -58,10 +59,30 @@
           </tr>
         </thead>
         <tbody>
+          <tr v-if="carrito.length === 0">
+            <td
+              colspan="5"
+              style="text-align: center; font-style: italic; color: #999"
+            >
+              No hay productos agregados
+            </td>
+          </tr>
           <tr v-for="(item, index) in carrito" :key="index">
-            <td>{{ item.nombre }}</td>
-            <td>
-              <InputNumber v-model="item.cantidad" :min="1" />
+            <td>{{ item.nombreProducto }}</td>
+            <td class="cantidad-control">
+              <div class="boton-cantidad">
+                <Button
+                  icon="pi pi-minus"
+                  text
+                  @click="disminuirCantidad(item)"
+                />
+                <span class="valor-cantidad">{{ item.cantidad }}</span>
+                <Button
+                  icon="pi pi-plus"
+                  text
+                  @click="aumentarCantidad(item)"
+                />
+              </div>
             </td>
             <td>$ {{ item.precioUnitario.toFixed(2) }}</td>
             <td>$ {{ (item.cantidad * item.precioUnitario).toFixed(2) }}</td>
@@ -77,7 +98,7 @@
           </tr>
         </tbody>
       </table>
-      <div class="total">
+      <div class="total" v-if="carrito.length > 0">
         <strong>Total: ${{ totalCarrito.toFixed(2) }}</strong>
       </div>
     </div>
@@ -96,7 +117,7 @@
             : 'Guardar'
         "
         icon="pi pi-check"
-        @click="guardarAtencion"
+        @click="onGuardar"
         :disabled="guardando"
       />
       <button class="btn-cerrar" @click="$emit('cancelar')" aria-label="Cerrar">
@@ -113,14 +134,13 @@ import AutoComplete from "primevue/autocomplete";
 import Button from "primevue/button";
 import UsuarioService from "../services/UsuarioService";
 import VentaService from "../services/VentaService";
-import Swal from "sweetalert2";
 
 export default {
   name: "VentaForm",
   components: { InputText, InputNumber, AutoComplete, Button },
   props: {
-    id: {
-      type: [String, Number],
+    venta: {
+      type: [String, Number, Object, null],
       default: null,
     },
   },
@@ -128,7 +148,7 @@ export default {
     return {
       guardando: false,
       formularioVisible: true,
-      ventaId: this.id ? parseInt(this.id) : null,
+      ventaId: this.venta?.id ? parseInt(this.venta.id) : null,
       formulario: {
         cliente: null,
       },
@@ -149,9 +169,28 @@ export default {
       );
     },
   },
+  watch: {
+    venta(nuevoValor) {
+      if (nuevoValor && nuevoValor !== null) {
+         console.log("Cliente recibido:", nuevoValor.cliente);
+        // Clonamos profundamente el cliente y detalles
+        this.formulario.cliente = nuevoValor.cliente
+          ? JSON.parse(JSON.stringify(nuevoValor.cliente))
+          : null;
+        this.carrito = nuevoValor.detalles
+          ? JSON.parse(JSON.stringify(nuevoValor.detalles))
+          : [];
+      } else {
+        this.limpiarFormulario();
+      }
+    },
+  },
   created() {
-    if (this.ventaId) {
-      this.cargarVenta();
+    if (this.venta && this.venta.detalles) {
+      this.formulario.cliente = this.venta.cliente
+        ? JSON.parse(JSON.stringify(this.venta.cliente))
+        : null;
+      this.carrito = JSON.parse(JSON.stringify(this.venta.detalles));
     }
   },
   methods: {
@@ -176,7 +215,14 @@ export default {
         this.clientesFiltrados = [];
       }
     },
-
+    aumentarCantidad(item) {
+      item.cantidad += 1;
+    },
+    disminuirCantidad(item) {
+      if (item.cantidad > 1) {
+        item.cantidad -= 1;
+      }
+    },
     async filtrarProductoServicios(event) {
       const query = event.query || "";
       if (!query || query.length < 1) {
@@ -200,12 +246,18 @@ export default {
     },
 
     agregarAlCarrito(producto) {
+      if (!producto.id || producto.id === 0) {
+        alert("Error: El producto seleccionado no tiene un ID válido.");
+        return;
+      }
+
       const existe = this.carrito.find((p) => p.id === producto.id);
       if (existe) {
         existe.cantidad += 1;
       } else {
         this.carrito.push({
-          id: producto.id,
+          productoServicioId: producto.id,
+          nombreProducto: producto.nombre,
           nombre: producto.nombre,
           cantidad: 1,
           precioUnitario: producto.precio,
@@ -214,13 +266,13 @@ export default {
       this.busquedaProducto = "";
       this.productos = [];
     },
-
     eliminarDelCarrito(index) {
       this.carrito.splice(index, 1);
     },
 
     validarFormulario() {
       this.errores = { cliente: null };
+
       if (this.carrito.length === 0) {
         alert("Debe agregar al menos un producto o servicio.");
         return false;
@@ -231,82 +283,20 @@ export default {
         return false;
       }
 
-      if (this.carrito.length === 0) {
-        alert("Debe agregar al menos un producto o servicio.");
-        return false;
-      }
-
       return true;
     },
 
-    async guardarAtencion() {
+    onGuardar() {
       if (!this.validarFormulario()) return;
 
-      const confirmResult = await Swal.fire({
-        title: `¿${this.ventaId ? "Actualizar" : "Crear"} atención para ${
-          this.formulario.cliente.nombre
-        }?`,
-        icon: "question",
-        showCancelButton: true,
-        confirmButtonColor: "#3085d6",
-        cancelButtonColor: "#6c757d",
-        confirmButtonText: this.ventaId ? "Sí, actualizar" : "Sí, crear",
-        cancelButtonText: "Cancelar",
-        background: "#18181b",
-        color: "#fff",
-      });
+      const datos = {
+        cliente: this.formulario.cliente,
+        detalles: this.carrito,
+        total: this.totalCarrito,
+        id: this.ventaId,
+      };
 
-      if (!confirmResult.isConfirmed) {
-        return; // No ocultar nada, el formulario sigue visible
-      }
-
-      this.guardando = true;
-
-      try {
-        const response = await VentaService.crearAtencionConDetalles({
-          ClienteId: this.formulario.cliente.id,
-          Total: this.totalCarrito,
-          TurnoId: null,
-          Detalles: this.carrito.map((item) => ({
-            ProductoServicioId: item.id,
-            Cantidad: item.cantidad,
-            PrecioUnitario: item.precioUnitario,
-          })),
-        });
-
-        const data = response.data;
-
-        await Swal.fire({
-          title: "Atención creada",
-          text: data.message || "La atención fue creada correctamente.",
-          icon: "success",
-          timer: 2000,
-          timerProgressBar: true,
-          showConfirmButton: false,
-          background: "#18181b",
-          color: "#fff",
-        });
-
-        this.limpiarFormulario();
-
-        // Emitir evento al padre para que cierre el formulario
-        this.$emit("guardar", data.atencion);
-      } catch (error) {
-        console.error("Error al guardar la atención:", error);
-        const msg =
-          error?.response?.data?.message ||
-          "Hubo un error al guardar la atención. Intente de nuevo.";
-
-        await Swal.fire({
-          title: "Error",
-          text: msg,
-          icon: "error",
-          background: "#18181b",
-          color: "#fff",
-        });
-      } finally {
-        this.guardando = false;
-      }
+      this.$emit("guardar", datos);
     },
 
     limpiarFormulario() {
@@ -315,29 +305,6 @@ export default {
       this.busquedaProducto = "";
       this.productos = [];
       this.errores = { cliente: null };
-    },
-
-    async cargarVenta() {
-      try {
-        const res = await VentaService.getVentas(1, 10, {
-          atencionId: this.ventaId,
-        });
-        const venta = res.data.ventas.find(
-          (v) => v.AtencionId === this.ventaId
-        );
-
-        if (venta) {
-          this.formulario.cliente = venta.Cliente;
-          this.carrito = venta.Detalles.map((d) => ({
-            id: d.ProductoServicioId,
-            nombre: d.NombreProducto,
-            cantidad: d.Cantidad,
-            precioUnitario: d.PrecioUnitario,
-          }));
-        }
-      } catch (error) {
-        console.error("Error al cargar venta:", error);
-      }
     },
   },
 };
@@ -488,5 +455,47 @@ label {
 
 .btn-eliminar-item:hover {
   color: #ff6b6b;
+}
+.auto-complete-fullwidth {
+  width: 100% !important;
+}
+
+.auto-complete-fullwidth ::v-deep .p-autocomplete-input {
+  width: 100% !important;
+  box-sizing: border-box;
+}
+.auto-complete-fullwidth {
+  width: 100% !important;
+}
+
+.auto-complete-fullwidth ::v-deep .p-autocomplete-input {
+  width: 100% !important;
+  box-sizing: border-box;
+}
+.boton-cantidad {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.boton-cantidad .p-button {
+  color: #28a745 !important;
+  padding: 0 6px !important;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.boton-cantidad .p-button:hover {
+  background-color: rgba(40, 167, 69, 0.1);
+}
+
+.valor-cantidad {
+  font-weight: bold;
+  min-width: 24px;
+  text-align: center;
+  user-select: none;
 }
 </style>

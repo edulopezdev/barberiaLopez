@@ -171,24 +171,26 @@ namespace backend.Controllers
                 );
             }
 
-            var pago = await _context.Pagos.FirstOrDefaultAsync(p => p.AtencionId == id);
+            var pagos = await _context.Pagos.Where(p => p.AtencionId == id).ToListAsync();
+
+            var detalles = atencion
+                .DetalleAtencion.Select(d => new DetalleVentaDto
+                {
+                    ProductoServicioId = d.ProductoServicioId,
+                    NombreProducto = d.ProductoServicio?.Nombre ?? "Producto/Servicio borrado",
+                    Cantidad = d.Cantidad,
+                    PrecioUnitario = d.PrecioUnitario,
+                })
+                .ToList();
 
             var venta = new VentaDto
             {
                 AtencionId = atencion.Id,
+                ClienteId = atencion.ClienteId,
                 ClienteNombre = atencion.Cliente?.Nombre ?? "Cliente Desconocido",
                 FechaAtencion = atencion.Fecha,
-                Detalles = atencion
-                    .DetalleAtencion.Select(d => new DetalleVentaDto
-                    {
-                        ProductoServicioId = d.ProductoServicioId,
-                        NombreProducto = d.ProductoServicio?.Nombre ?? "Producto/Servicio borrado",
-                        Cantidad = d.Cantidad,
-                        PrecioUnitario = d.PrecioUnitario,
-                    })
-                    .ToList(),
-                Pagos = await _context
-                    .Pagos.Where(p => p.AtencionId == id)
+                Detalles = detalles,
+                Pagos = pagos
                     .Select(p => new PagoInfoDto
                     {
                         PagoId = p.Id,
@@ -196,7 +198,7 @@ namespace backend.Controllers
                         Monto = p.Monto,
                         FechaPago = p.Fecha,
                     })
-                    .ToListAsync(),
+                    .ToList(),
             };
 
             return Ok(

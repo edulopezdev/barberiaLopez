@@ -18,10 +18,16 @@ using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configuración explícita de logging a consola
-builder.Logging.ClearProviders(); // Limpia los proveedores existentes (opcional)
-builder.Logging.AddConsole(); // Asegura logs en consola
-builder.Logging.SetMinimumLevel(LogLevel.Information); // Nivel mínimo de logs
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+
+builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Warning); // solo warnings+ comandos SQL
+builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Query", LogLevel.Error); // oculta warnings de query (como Skip/Take sin OrderBy)
+builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Error); // para otros logs EF Core, solo errores
+builder.Logging.AddFilter("Microsoft", LogLevel.Warning); // Microsoft en general, solo warnings+
+builder.Logging.AddFilter("System", LogLevel.Warning); // System en general, solo warnings+
+
+builder.Logging.SetMinimumLevel(LogLevel.Information); // para tu código, info+
 
 // Servicios
 

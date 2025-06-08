@@ -17,11 +17,17 @@ namespace backend.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly IConfiguration _configuration;
+        private readonly ILogger<AuthController> _logger;
 
-        public AuthController(ApplicationDbContext context, IConfiguration configuration)
+        public AuthController(
+            ApplicationDbContext context,
+            IConfiguration configuration,
+            ILogger<AuthController> logger
+        )
         {
             _context = context;
             _configuration = configuration;
+            _logger = logger;
         }
 
         // POST: api/auth/login
@@ -30,6 +36,11 @@ namespace backend.Controllers
         {
             if (string.IsNullOrEmpty(request.Email) || string.IsNullOrEmpty(request.Password))
             {
+                _logger.LogWarning(
+                    "Intento de login con campos vacíos. Email: '{Email}', Password vacío: {PasswordEmpty}",
+                    request.Email ?? "(nulo)",
+                    string.IsNullOrEmpty(request.Password)
+                );
                 return BadRequest(
                     new
                     {
@@ -49,6 +60,7 @@ namespace backend.Controllers
                 || !VerifyPassword(request.Password, usuario.PasswordHash)
             )
             {
+                _logger.LogWarning("Login fallido para el email: {Email}", request.Email);
                 return Unauthorized(
                     new
                     {
@@ -58,7 +70,7 @@ namespace backend.Controllers
                     }
                 );
             }
-
+            _logger.LogInformation("Usuario logueado exitosamente: {Email}", usuario.Email);
             var token = GenerateJwtToken(usuario);
 
             return Ok(

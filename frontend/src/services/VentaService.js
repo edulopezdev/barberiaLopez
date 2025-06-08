@@ -36,11 +36,14 @@ export default {
     return apiClient.get(`/detalleatencion/ventas/${atencionId}`);
   },
 
-  crearAtencionConDetalles(atencionData) {
+  crearVenta(atencionData) {
     console.log(JSON.stringify(atencionData, null, 2));
     return apiClient.post("/atencion", atencionData);
   },
   RegistrarPago(pagoData) {
     return apiClient.post("/pago", pagoData);
+  },
+  actualizarVenta(atencionId, datosActualizados) {
+    return apiClient.put(`/atencion/${atencionId}`, datosActualizados);
   },
 };

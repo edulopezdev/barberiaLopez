@@ -59,12 +59,6 @@
       <button class="btn-cerrar" @click="$emit('cerrar')" aria-label="Cerrar">
         <i class="pi pi-times"></i>
       </button>
-      <router-link
-        :to="{ name: 'VentaEditar', params: { id: venta?.AtencionId } }"
-        class="btn-editar"
-      >
-        <i class="pi pi-pencil"></i> Editar
-      </router-link>
     </div>
   </div>
 </template>
@@ -175,23 +169,5 @@ p {
   color: #ccc;
   font-size: 1.2rem;
   cursor: pointer;
-}
-
-.btn-editar {
-  background-color: #4a90e2;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  padding: 0.5rem 1rem;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  text-decoration: none;
-  transition: background-color 0.3s ease;
-}
-
-.btn-editar:hover {
-  background-color: #357abd;
 }
 </style>

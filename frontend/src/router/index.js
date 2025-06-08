@@ -119,13 +119,6 @@ const routes = [
     meta: { requiresAuth: true, requiredRole: ["Administrador", "Barbero"] },
   },
   {
-    path: "/ventas/:id/editar",
-    name: "VentaEditar",
-    component: VentaForm,
-    props: true,
-    meta: { requiresAuth: true, requiredRole: ["Administrador", "Barbero"] },
-  },
-  {
     path: "/ventas/:id/detalle",
     name: "VentaDetalle",
     component: VentaDetalle,

@@ -21,7 +21,6 @@
           </div>
         </div>
       </template>
-
       <template #content>
         <DataTable
           v-model:filters="filters"
@@ -39,10 +38,7 @@
           @sort="onSort"
           @filter="onFilter"
         >
-          <Column field="cliente" sortable>
-            <template #header>
-              <span class="titulo-columna">Cliente</span>
-            </template>
+          <Column field="cliente" sortable header="Cliente">
             <template #filter="{ filterModel, filterCallback }">
               <InputText
                 v-model="filterModel.value"
@@ -51,7 +47,6 @@
               />
             </template>
           </Column>
-
           <Column field="producto" header="Producto" sortable>
             <template #filter="{ filterModel, filterCallback }">
               <InputText
@@ -61,7 +56,6 @@
               />
             </template>
           </Column>
-
           <Column field="fecha" header="Fecha" sortable>
             <template #filter="{ filterModel, filterCallback }">
               <InputText
@@ -76,7 +70,6 @@
               ${{ slotProps.data.montoPagado?.toFixed(2) || "0.00" }}
             </template>
           </Column>
-
           <Column field="estado" header="Estado">
             <template #body="slotProps">
               <Tag
@@ -98,12 +91,6 @@
               />
             </template>
           </Column>
-          <Column field="montoPagado" header="Pagado" sortable>
-            <template #body="slotProps">
-              ${{ slotProps.data.montoPagado?.toFixed(2) || 0 }}
-            </template>
-          </Column>
-
           <Column header="Acciones" style="min-width: 180px">
             <template #body="slotProps">
               <div class="acciones-botones">
@@ -123,7 +110,7 @@
                   v-tooltip.bottom="'Editar venta'"
                   @click="editarVenta(slotProps.data)"
                 />
-                <!-- Botón pagar si está pendiente, ícono check si ya está pagada -->
+                <!-- Botón pagar si está pendiente -->
                 <Button
                   v-if="!slotProps.data.estado"
                   icon="pi pi-dollar"
@@ -133,7 +120,6 @@
                   v-tooltip.bottom="'Pagar venta'"
                   @click="pagarDialog(slotProps.data)"
                 />
-
                 <span
                   v-else
                   class="icono-check"
@@ -168,7 +154,7 @@
     >
       <VentaForm
         :venta="ventaSeleccionada"
-        @guardar="guardarVenta($event)"
+        @guardar="guardarVenta"
         @cancelar="cerrarModal"
       />
     </Dialog>
@@ -179,15 +165,12 @@
       header="Detalle de la Venta"
       :modal="true"
       :closable="false"
-      style="width: 450px"
+      style="width: 650px"
     >
-      <!-- Mensaje de carga o error -->
       <div v-if="!ventaSeleccionada" class="mensaje-carga">
         <i class="pi pi-spin pi-spinner" style="font-size: 1.5rem"></i>
         <span>Cargando detalle...</span>
       </div>
-
-      <!-- Mostrar componente solo si ventaSeleccionada tiene datos -->
       <VentaDetalle
         v-else
         :venta="ventaSeleccionada"
@@ -196,6 +179,7 @@
     </Dialog>
   </div>
 </template>
+
 <script>
 import VentaService from "../services/VentaService";
 import DataTable from "primevue/datatable";
@@ -208,7 +192,6 @@ import Dropdown from "primevue/dropdown";
 import Dialog from "primevue/dialog";
 import { FilterMatchMode } from "primevue/api";
 import Swal from "sweetalert2";
-
 import VentaForm from "../components/VentaForm.vue";
 import VentaDetalle from "../components/VentaDetalle.vue";
 
@@ -237,7 +220,7 @@ export default {
       loading: false,
       mostrarFiltros: false,
       mostrarModal: false,
-      ventaSeleccionada: null,
+      ventaSeleccionada: null, // Aquí se guarda el objeto completo
       mostrarDetalleModal: false,
       filters: {
         cliente: { value: null, matchMode: FilterMatchMode.CONTAINS },
@@ -255,12 +238,9 @@ export default {
       this.loading = true;
       try {
         const res = await VentaService.getVentas(page, pageSize);
-
-        // Transformamos cada venta para que tenga los campos que espera la tabla
         this.ventas = res.data.ventas.map((venta) => {
           const pagos = venta.pagos || [];
           const montoPagado = pagos.reduce((acc, p) => acc + p.monto, 0);
-
           return {
             cliente: venta.clienteNombre,
             producto: venta.detalles.map((d) => d.nombreProducto).join(", "),
@@ -271,7 +251,6 @@ export default {
             montoPagado,
           };
         });
-
         this.totalVentas = res.data.pagination?.total || this.ventas.length;
         this.currentPage = page;
         this.pageSize = pageSize;
@@ -283,7 +262,229 @@ export default {
         this.loading = false;
       }
     },
+    onPageChange(event) {
+      this.obtenerVentas(event.page + 1, event.rows);
+    },
+    onSort(event) {
+      this.sortField = event.sortField;
+      this.sortOrder = event.sortOrder;
+      this.obtenerVentas(this.currentPage, this.pageSize);
+    },
+    onFilter() {
+      this.obtenerVentas(1, this.pageSize);
+    },
+    crearVenta() {
+      this.ventaSeleccionada = this.nuevaVentaVacia(); // Siempre inicializa bien
+      this.mostrarModal = true;
+      document.body.classList.add("modal-open");
+    },
+    nuevaVentaVacia() {
+      return {
+        cliente: null,
+        detalles: [],
+      };
+    },
+    editarVenta(venta) {
+      if (!venta.id) {
+        Swal.fire(
+          "Error",
+          "No se encontró el ID de la venta para editar.",
+          "error"
+        );
+        return;
+      }
 
+      this.loading = true;
+      VentaService.getVentaById(venta.id)
+        .then((res) => {
+          const data = res.data.venta;
+
+          if (!data.clienteId || data.clienteId <= 0) {
+            console.warn("ClienteId inválido o faltante:", data);
+            Swal.fire("Error", "Cliente inválido o no encontrado.", "error");
+            return;
+          }
+
+          if (!Array.isArray(data.detalles)) {
+            console.warn("Detalles de venta inválidos o faltantes:", data);
+            Swal.fire("Error", "Detalles de venta no encontrados.", "error");
+            return;
+          }
+
+          this.ventaSeleccionada = {
+            id: data.atencionId,
+            cliente: {
+              id: data.clienteId, // Aseguramos que ClienteId venga del backend
+              nombre: data.clienteNombre, // Aseguramos que ClienteNombre también se pase
+            },
+            detalles: data.detalles.map((d) => ({
+              productoServicioId: d.productoServicioId ?? 0, // Evitamos valores `undefined`
+              cantidad: d.cantidad ?? 1, // Asignamos un mínimo por seguridad
+              precioUnitario: d.precioUnitario ?? 0.0, // Evitamos valores `undefined`
+            })),
+            total: data.totalVenta ?? 0.0, // Evitamos valores `undefined`
+          };
+
+          this.mostrarModal = true;
+          document.body.classList.add("modal-open");
+        })
+        .catch((error) => {
+          console.error("Error al cargar la venta:", error);
+          Swal.fire(
+            "Error",
+            "No se pudo cargar la venta para editar.",
+            "error"
+          );
+        })
+        .finally(() => {
+          this.loading = false;
+        });
+    },
+    cerrarModal() {
+      this.mostrarModal = false;
+      document.body.classList.remove("modal-open");
+    },
+    verDetalles(venta) {
+      const atencionId = venta.id;
+      if (!atencionId) {
+        Swal.fire("Error", "ID de venta no encontrado.", "error");
+        return;
+      }
+      VentaService.getVentaById(atencionId)
+        .then((res) => {
+          const data = res.data.venta;
+          this.ventaSeleccionada = {
+            ClienteNombre: data.clienteNombre,
+            FechaAtencion: data.fechaAtencion,
+            Detalles: data.detalles.map((d) => ({
+              NombreProducto: d.nombreProducto,
+              Cantidad: d.cantidad,
+              PrecioUnitario: d.precioUnitario,
+              Subtotal: d.subtotal,
+            })),
+            TotalVenta: data.totalVenta,
+            Pago: data.pago
+              ? {
+                  MetodoPago: data.pago.metodoPago,
+                  Monto: data.pago.monto,
+                }
+              : null,
+            AtencionId: atencionId,
+          };
+          this.mostrarDetalleModal = true;
+        })
+        .catch(() => {
+          Swal.fire(
+            "Error",
+            "No se pudo cargar el detalle de la venta.",
+            "error"
+          );
+        });
+    },
+    async guardarVenta(datosVenta) {
+      this.cerrarModal();
+      const mensaje = datosVenta.id
+        ? `¿Actualizar venta a ${datosVenta.cliente?.nombre || "Cliente"}?`
+        : "¿Registrar nueva venta?";
+
+      const result = await Swal.fire({
+        title: mensaje,
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonColor: "#3085d6",
+        cancelButtonColor: "#6c757d",
+        confirmButtonText: "Sí, confirmar",
+        cancelButtonText: "Cancelar",
+        background: "#18181b",
+        color: "#fff",
+      });
+
+      if (result.isConfirmed) {
+        try {
+          let response;
+          if (datosVenta.id) {
+            // Actualizar venta existente
+            response = await VentaService.actualizarVenta(datosVenta.id, {
+              id: datosVenta.id,
+              clienteId: datosVenta.cliente.id,
+              total: datosVenta.total,
+              detalleAtencion: datosVenta.detalles.map((d) => ({
+                productoServicioId: d.productoServicioId || d.id,
+                cantidad: d.cantidad,
+                precioUnitario: d.precioUnitario,
+              })),
+            });
+          } else {
+            // Crear nueva venta
+            if (datosVenta.id) {
+              // Validamos que el cliente tenga ID
+              if (!datosVenta.cliente || !datosVenta.cliente.id) {
+                Swal.fire(
+                  "Error",
+                  "Debe seleccionar un cliente válido.",
+                  "error"
+                );
+                return;
+              }
+
+              response = await VentaService.actualizarVenta(datosVenta.id, {
+                id: datosVenta.id, // obligatorio para que coincida con la URL
+                clienteId: datosVenta.cliente.id, // aseguramos que sea número > 0
+                total: datosVenta.total,
+                detalleAtencion: datosVenta.detalles.map((d) => ({
+                  productoServicioId: d.productoServicioId || d.id,
+                  cantidad: d.cantidad,
+                  precioUnitario: d.precioUnitario,
+                })),
+              });
+            }
+          }
+
+          await Swal.fire({
+            title: "Éxito",
+            text: `Venta ${
+              datosVenta.id ? "actualizada" : "creada"
+            } correctamente.`,
+            icon: "success",
+            timer: 2000,
+            showConfirmButton: false,
+            background: "#18181b",
+            color: "#fff",
+          });
+
+          this.obtenerVentas(this.currentPage, this.pageSize);
+          this.cerrarModal();
+        } catch (error) {
+          console.error("Error al guardar la venta:", error);
+
+          const backendMessage =
+            error?.response?.data?.message ||
+            "Hubo un error al guardar la venta.";
+
+          await Swal.fire({
+            title: "Error",
+            text: backendMessage,
+            icon: "error",
+            background: "#18181b",
+            color: "#fff",
+          });
+
+          this.abrirModalConDatos(datosVenta); // Reabre con los mismos datos
+        }
+      } else {
+        this.abrirModalConDatos(datosVenta); // Canceló → vuelve al formulario
+      }
+    },
+    abrirModalConDatos(datosVenta) {
+      if (!datosVenta || !datosVenta.cliente) {
+        console.warn("Datos incompletos al reabrir modal", datosVenta);
+        return;
+      }
+
+      this.ventaSeleccionada = JSON.parse(JSON.stringify(datosVenta));
+      this.mostrarModal = true;
+      document.body.classList.add("modal-open");
+    },
     pagarDialog(venta) {
       Swal.fire({
         title: `Registrar pago de $${venta.totalVenta}?`,
@@ -307,7 +508,6 @@ export default {
             monto: venta.totalVenta,
             fecha: new Date().toISOString(),
           };
-
           VentaService.RegistrarPago(nuevoPago)
             .then(() => {
               Swal.fire({
@@ -319,13 +519,10 @@ export default {
                 timer: 2000,
                 showConfirmButton: false,
               });
-
-              // Esperamos 500ms para dar tiempo al backend a actualizar datos
               setTimeout(() => {
                 this.obtenerVentas(this.currentPage, this.pageSize);
               }, 500);
             })
-
             .catch((error) => {
               console.error("Error al registrar el pago:", error);
               Swal.fire({
@@ -336,194 +533,6 @@ export default {
                 color: "#fff",
               });
             });
-        }
-      });
-    },
-    onPageChange(event) {
-      this.obtenerVentas(event.page + 1, event.rows);
-    },
-
-    onSort(event) {
-      this.sortField = event.sortField;
-      this.sortOrder = event.sortOrder;
-      this.obtenerVentas(this.currentPage, this.pageSize);
-    },
-
-    onFilter() {
-      this.obtenerVentas(1, this.pageSize);
-    },
-
-    crearVenta() {
-      console.log("Click en Nueva Venta");
-
-      this.ventaSeleccionada = null;
-      this.mostrarModal = true;
-      document.body.classList.add("modal-open");
-    },
-
-    editarVenta(venta) {
-      this.ventaSeleccionada = { ...venta };
-      this.mostrarModal = true;
-      document.body.classList.add("modal-open");
-    },
-
-    cerrarModal() {
-      this.mostrarModal = false;
-      document.body.classList.remove("modal-open");
-    },
-
-    verDetalles(venta) {
-      const atencionId = venta.id; // <- corregido aquí
-
-      if (!atencionId) {
-        Swal.fire("Error", "ID de venta no encontrado.", "error");
-        return;
-      }
-
-      VentaService.getVentaById(atencionId)
-        .then((res) => {
-          const data = res.data.venta;
-
-          this.ventaSeleccionada = {
-            ClienteNombre: data.clienteNombre,
-            FechaAtencion: data.fechaAtencion,
-            Detalles: data.detalles.map((d) => ({
-              NombreProducto: d.nombreProducto,
-              Cantidad: d.cantidad,
-              PrecioUnitario: d.precioUnitario,
-              Subtotal: d.subtotal,
-            })),
-            TotalVenta: data.totalVenta,
-            Pago: data.pago
-              ? {
-                  MetodoPago: data.pago.metodoPago,
-                  Monto: data.pago.monto,
-                }
-              : null,
-            AtencionId: atencionId, // <- necesario si usas router-link para editar
-          };
-
-          this.mostrarDetalleModal = true;
-        })
-        .catch(() => {
-          Swal.fire(
-            "Error",
-            "No se pudo cargar el detalle de la venta.",
-            "error"
-          );
-        });
-    },
-    async guardarVenta(ventaActualizada) {
-      this.cerrarModal();
-
-      const mensaje = ventaActualizada.id
-        ? "¿Actualizar esta venta?"
-        : "¿Registrar nueva venta?";
-
-      const result = await Swal.fire({
-        title: mensaje,
-        icon: "question",
-        showCancelButton: true,
-        confirmButtonColor: "#3085d6",
-        cancelButtonColor: "#6c757d",
-        confirmButtonText: "Sí, confirmar",
-        cancelButtonText: "Cancelar",
-        background: "#18181b",
-        color: "#fff",
-      });
-
-      if (result.isConfirmed) {
-        try {
-          if (ventaActualizada.id) {
-            // Aquí podrías usar: await VentaService.actualizarVenta(ventaActualizada.id, ventaActualizada);
-          } else {
-            // Aquí podrías usar: await VentaService.crearVenta(ventaActualizada);
-          }
-
-          Swal.fire({
-            title: "Éxito",
-            text: `Venta ${
-              ventaActualizada.id ? "actualizada" : "creada"
-            } correctamente.`,
-            icon: "success",
-            timer: 2000,
-            showConfirmButton: false,
-            background: "#18181b",
-            color: "#fff",
-          });
-
-          this.obtenerVentas(this.currentPage, this.pageSize);
-        } catch (error) {
-          const mensaje =
-            error?.response?.data?.message || "No se pudo guardar la venta.";
-          console.error("Error al guardar venta:", error);
-          Swal.fire({
-            title: "Error",
-            text: mensaje,
-            icon: "error",
-            background: "#18181b",
-            color: "#fff",
-          });
-          this.ventaSeleccionada = ventaActualizada;
-          this.mostrarModal = true;
-        }
-      } else {
-        this.ventaSeleccionada = ventaActualizada;
-        this.mostrarModal = true;
-      }
-    },
-
-    anularVenta(venta) {
-      Swal.fire({
-        title: `¿Anular venta de ${venta.cliente}?`,
-        text: "Esta acción no se puede deshacer.",
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonText: "Sí, anular",
-        cancelButtonText: "Cancelar",
-        confirmButtonColor: "#e74c3c",
-        cancelButtonColor: "#6c757d",
-        background: "#18181b",
-        color: "#fff",
-      }).then((result) => {
-        if (result.isConfirmed) {
-          Swal.fire({
-            title: "Anulada",
-            text: "La venta ha sido anulada.",
-            icon: "success",
-            timer: 2000,
-            showConfirmButton: false,
-            background: "#18181b",
-            color: "#fff",
-          });
-          this.obtenerVentas(this.currentPage, this.pageSize);
-        }
-      });
-    },
-
-    reactivarVenta(venta) {
-      Swal.fire({
-        title: `¿Reactivar venta de ${venta.cliente}?`,
-        icon: "question",
-        showCancelButton: true,
-        confirmButtonText: "Sí, reactivar",
-        cancelButtonText: "Cancelar",
-        confirmButtonColor: "#28a745",
-        cancelButtonColor: "#6c757d",
-        background: "#18181b",
-        color: "#fff",
-      }).then((result) => {
-        if (result.isConfirmed) {
-          Swal.fire({
-            title: "Reactivada",
-            text: "La venta ha sido reactivada.",
-            icon: "success",
-            timer: 2000,
-            showConfirmButton: false,
-            background: "#18181b",
-            color: "#fff",
-          });
-          this.obtenerVentas(this.currentPage, this.pageSize);
         }
       });
     },
@@ -640,12 +649,12 @@ export default {
   justify-content: center !important;
 }
 
-:deep(.p-datatable-thead > tr > th:nth-child(7)) /* Acciones */ {
+:deep(.p-datatable-thead > tr > th:nth-child(6)) /* Acciones */ {
   text-align: center !important;
   vertical-align: middle !important;
 }
 
-:deep(.p-datatable-thead > tr > th:nth-child(7) .p-column-header-content) {
+:deep(.p-datatable-thead > tr > th:nth-child(6) .p-column-header-content) {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
