@@ -75,6 +75,7 @@ namespace backend.Controllers
         }
 
         // GET: api/detalleatencion/ventas
+        // GET: api/detalleatencion/ventas
         [HttpGet("ventas")]
         public async Task<IActionResult> GetVentas(int page = 1, int pageSize = 10)
         {
@@ -104,7 +105,13 @@ namespace backend.Controllers
                 .Select(a => new VentaDto
                 {
                     AtencionId = a.Id,
+                    ClienteId = a.ClienteId,
                     ClienteNombre = a.Cliente?.Nombre ?? "Cliente Desconocido",
+                    Cliente = new UsuarioResumenDto
+                    {
+                        Id = a.Cliente?.Id ?? 0,
+                        Nombre = a.Cliente?.Nombre ?? "Cliente Desconocido",
+                    },
                     FechaAtencion = a.Fecha,
                     Detalles = a
                         .DetalleAtencion.Select(d => new DetalleVentaDto
@@ -116,7 +123,6 @@ namespace backend.Controllers
                             PrecioUnitario = d.PrecioUnitario,
                         })
                         .ToList(),
-
                     Pagos = pagos
                         .Where(p => p.AtencionId == a.Id)
                         .Select(p => new PagoInfoDto
@@ -188,6 +194,11 @@ namespace backend.Controllers
                 AtencionId = atencion.Id,
                 ClienteId = atencion.ClienteId,
                 ClienteNombre = atencion.Cliente?.Nombre ?? "Cliente Desconocido",
+                Cliente = new UsuarioResumenDto
+                {
+                    Id = atencion.Cliente?.Id ?? 0,
+                    Nombre = atencion.Cliente?.Nombre ?? "Cliente Desconocido",
+                },
                 FechaAtencion = atencion.Fecha,
                 Detalles = detalles,
                 Pagos = pagos

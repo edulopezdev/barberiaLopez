@@ -37,13 +37,20 @@ export default {
   },
 
   crearVenta(atencionData) {
-    console.log(JSON.stringify(atencionData, null, 2));
+    console.log(
+      "Enviando payload al backend:",
+      JSON.stringify(atencionData, null, 2)
+    );
     return apiClient.post("/atencion", atencionData);
   },
   RegistrarPago(pagoData) {
     return apiClient.post("/pago", pagoData);
   },
   actualizarVenta(atencionId, datosActualizados) {
+    console.log(
+      "Payload para PUT /atencion/" + atencionId + ":",
+      JSON.stringify(datosActualizados, null, 2)
+    );
     return apiClient.put(`/atencion/${atencionId}`, datosActualizados);
   },
 };

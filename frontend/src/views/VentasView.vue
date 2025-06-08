@@ -383,8 +383,9 @@ export default {
     },
     async guardarVenta(datosVenta) {
       this.cerrarModal();
+
       const mensaje = datosVenta.id
-        ? `¿Actualizar venta a ${datosVenta.cliente?.nombre || "Cliente"}?`
+        ? `¿Actualizar venta de ${datosVenta.cliente?.nombre || "Cliente"}?`
         : "¿Registrar nueva venta?";
 
       const result = await Swal.fire({
@@ -399,80 +400,70 @@ export default {
         color: "#fff",
       });
 
-      if (result.isConfirmed) {
-        try {
-          let response;
-          if (datosVenta.id) {
-            // Actualizar venta existente
-            response = await VentaService.actualizarVenta(datosVenta.id, {
-              id: datosVenta.id,
-              clienteId: datosVenta.cliente.id,
-              total: datosVenta.total,
-              detalleAtencion: datosVenta.detalles.map((d) => ({
-                productoServicioId: d.productoServicioId || d.id,
-                cantidad: d.cantidad,
-                precioUnitario: d.precioUnitario,
-              })),
-            });
-          } else {
-            // Crear nueva venta
-            if (datosVenta.id) {
-              // Validamos que el cliente tenga ID
-              if (!datosVenta.cliente || !datosVenta.cliente.id) {
-                Swal.fire(
-                  "Error",
-                  "Debe seleccionar un cliente válido.",
-                  "error"
-                );
-                return;
-              }
+      if (!result.isConfirmed) {
+        this.abrirModalConDatos(datosVenta);
+        return;
+      }
 
-              response = await VentaService.actualizarVenta(datosVenta.id, {
-                id: datosVenta.id, // obligatorio para que coincida con la URL
-                clienteId: datosVenta.cliente.id, // aseguramos que sea número > 0
-                total: datosVenta.total,
-                detalleAtencion: datosVenta.detalles.map((d) => ({
-                  productoServicioId: d.productoServicioId || d.id,
-                  cantidad: d.cantidad,
-                  precioUnitario: d.precioUnitario,
-                })),
-              });
-            }
-          }
+      try {
+        let response;
 
-          await Swal.fire({
-            title: "Éxito",
-            text: `Venta ${
-              datosVenta.id ? "actualizada" : "creada"
-            } correctamente.`,
-            icon: "success",
-            timer: 2000,
-            showConfirmButton: false,
-            background: "#18181b",
-            color: "#fff",
+        if (datosVenta.id) {
+          // Actualizar venta existente (PUT)
+          response = await VentaService.actualizarVenta(datosVenta.id, {
+            clienteId: datosVenta.cliente.id,
+            barberoId: datosVenta.barbero.id,
+            fechaAtencion: datosVenta.fechaAtencion,
+            total: datosVenta.total,
+            detalles: datosVenta.detalles.map((d) => ({
+              productoServicioId: d.productoServicioId || d.id,
+              cantidad: d.cantidad,
+              precioUnitario: d.precioUnitario,
+            })),
           });
-
-          this.obtenerVentas(this.currentPage, this.pageSize);
-          this.cerrarModal();
-        } catch (error) {
-          console.error("Error al guardar la venta:", error);
-
-          const backendMessage =
-            error?.response?.data?.message ||
-            "Hubo un error al guardar la venta.";
-
-          await Swal.fire({
-            title: "Error",
-            text: backendMessage,
-            icon: "error",
-            background: "#18181b",
-            color: "#fff",
+        } else {
+          // Crear nueva venta (POST)
+          response = await VentaService.crearVenta({
+            clienteId: datosVenta.cliente.id,
+            total: datosVenta.total,
+            detalles: datosVenta.detalles.map((d) => ({
+              productoServicioId: d.productoServicioId || d.id,
+              cantidad: d.cantidad,
+              precioUnitario: d.precioUnitario,
+            })),
           });
-
-          this.abrirModalConDatos(datosVenta); // Reabre con los mismos datos
         }
-      } else {
-        this.abrirModalConDatos(datosVenta); // Canceló → vuelve al formulario
+
+        await Swal.fire({
+          title: "Éxito",
+          text: `Venta ${
+            datosVenta.id ? "actualizada" : "creada"
+          } correctamente.`,
+          icon: "success",
+          timer: 2000,
+          showConfirmButton: false,
+          background: "#18181b",
+          color: "#fff",
+        });
+
+        this.obtenerVentas(this.currentPage, this.pageSize);
+        this.cerrarModal();
+      } catch (error) {
+        console.error("Error al guardar la venta:", error);
+
+        const backendMessage =
+          error?.response?.data?.message ||
+          "Hubo un error al guardar la venta.";
+
+        await Swal.fire({
+          title: "Error",
+          text: backendMessage,
+          icon: "error",
+          background: "#18181b",
+          color: "#fff",
+        });
+
+        this.abrirModalConDatos(datosVenta); // Reabre con datos anteriores
       }
     },
     abrirModalConDatos(datosVenta) {

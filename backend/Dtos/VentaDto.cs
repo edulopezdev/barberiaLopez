@@ -5,6 +5,8 @@ namespace backend.Dtos
         public int AtencionId { get; set; }
         public int ClienteId { get; set; }
 
+        public UsuarioResumenDto Cliente { get; set; } = new();
+
         public string ClienteNombre { get; set; } = string.Empty;
         public DateTime FechaAtencion { get; set; }
 
