@@ -172,13 +172,24 @@ export default {
   watch: {
     venta(nuevoValor) {
       if (nuevoValor && nuevoValor !== null) {
-         console.log("Cliente recibido:", nuevoValor.cliente);
-        // Clonamos profundamente el cliente y detalles
+        console.log("Cliente recibido:", nuevoValor.cliente);
+
+        // Clonar profundamente el cliente
         this.formulario.cliente = nuevoValor.cliente
           ? JSON.parse(JSON.stringify(nuevoValor.cliente))
           : null;
+
+        // Normalizar los detalles para asegurar nombreProducto
         this.carrito = nuevoValor.detalles
-          ? JSON.parse(JSON.stringify(nuevoValor.detalles))
+          ? nuevoValor.detalles.map((detalle) => ({
+              productoServicioId: detalle.productoServicioId,
+              cantidad: detalle.cantidad,
+              precioUnitario: detalle.precioUnitario,
+              nombreProducto:
+                detalle.nombreProducto ||
+                detalle.nombre ||
+                "Producto sin nombre",
+            }))
           : [];
       } else {
         this.limpiarFormulario();

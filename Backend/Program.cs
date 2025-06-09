@@ -35,14 +35,14 @@ builder.Logging.SetMinimumLevel(LogLevel.Information); // para tu código, info+
 var corsPolicy = "_myAllowSpecificOrigins";
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy(
+    options.AddPolicy( //aca lo q hacemos es crear un policy con el nombre "_myAllowSpecificOrigins"
         corsPolicy,
         policy =>
         {
             policy
-                .WithOrigins("http://localhost:5173") // Permitir solicitudes desde Vue
-                .AllowAnyMethod()
-                .AllowAnyHeader();
+                .WithOrigins("http://localhost:5173") // entonces aca estamos diciendo que permitimos q la url http://localhost:5173 haga peticiones
+                .AllowAnyMethod() // esto es para permitir cualquier metodo (http, post, put, delete, etc.)
+                .AllowAnyHeader(); // esto es para permitir cualquier header de la peticion (http, content-type, authorization, etc.)
         }
     );
 });
@@ -107,15 +107,16 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 // Configurar autenticación JWT
 builder
-    .Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
+    .Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme) // esto es para autenticar con JWT
+    .AddJwtBearer(options => // esto es para configurar JWT
     {
         var jwtKey =
             builder.Configuration["Jwt:Key"]
-            ?? throw new ArgumentNullException("Jwt:Key no está definido");
+            ?? throw new ArgumentNullException("Jwt:Key no está definido"); // esto es para obtener la clave de JWT
 
-        var key = Encoding.ASCII.GetBytes(jwtKey);
+        var key = Encoding.ASCII.GetBytes(jwtKey); // esto es para convertir la clave de JWT a bytes
 
+        // esto es para configurar JWT para autenticación y autorización de JWT
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -128,7 +129,7 @@ builder
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(); // esto lo q hace es configurar autorización
 
 var app = builder.Build();
 

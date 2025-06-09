@@ -41,7 +41,7 @@
           :autoLayout="true"
         >
           <!-- Nombre -->
-          <Column field="nombre" header="Nombre" sortable>
+          <Column field="nombre" sortable>
             <template #header>
               <span class="titulo-columna">Nombre</span>
             </template>

@@ -15,6 +15,16 @@
       </div>
     </div>
 
+    <div class="campo">
+      <label><i class="pi pi-credit-card"></i> Pagos Realizados</label>
+      <div v-if="venta?.Pagos?.length">
+        <Tag v-for="pago in venta.Pagos" :key="pago.pagoId" severity="success">
+          {{ pago.metodoPago }} - ${{ pago.monto.toFixed(2) }}
+        </Tag>
+      </div>
+      <Tag v-else severity="warning">Pendiente</Tag>
+    </div>
+
     <!-- Detalles de productos/servicios -->
     <div class="seccion">
       <h4><i class="pi pi-list"></i> Productos y Servicios</h4>
@@ -42,13 +52,15 @@
     <div class="seccion">
       <div class="campo">
         <label><i class="pi pi-dollar"></i> Total de Venta</label>
-        <p><strong>$ {{ venta?.TotalVenta.toFixed(2) }}</strong></p>
+        <p>
+          <strong>$ {{ venta?.TotalVenta.toFixed(2) }}</strong>
+        </p>
       </div>
 
       <div class="campo">
-        <label><i class="pi pi-credit-card"></i> Pago</label>
-        <Tag v-if="venta?.Pago" severity="success">
-          {{ venta.Pago.MetodoPago }} - ${{ venta.Pago.Monto }}
+        <label><i class="pi pi-credit-card"></i> Estado del Pago</label>
+        <Tag v-if="venta?.Pagos?.length" severity="success">
+          {{ totalPagado >= venta.TotalVenta ? "Completada" : "Parcial" }}
         </Tag>
         <Tag v-else severity="warning">Pendiente</Tag>
       </div>
@@ -87,6 +99,11 @@ export default {
         hour: "2-digit",
         minute: "2-digit",
       });
+    },
+  },
+  computed: {
+    totalPagado() {
+      return this.venta?.Pagos?.reduce((acc, pago) => acc + pago.monto, 0) || 0;
     },
   },
 };

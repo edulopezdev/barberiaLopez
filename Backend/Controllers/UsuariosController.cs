@@ -18,38 +18,40 @@ namespace backend.Controllers
     [Route("api/[controller]")]
     [ApiController]
     [Authorize] // protección general de todos los endpoints
+    // este es el controlador de usuarios q hereda de ControllerBase
     public class UsuariosController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
+        private readonly ApplicationDbContext _context; // aca se define el contexto para interactuar con la BD
 
         public UsuariosController(ApplicationDbContext context)
         {
-            _context = context;
+            _context = context; // se inyecta el contexto para interactuar con la BD
         }
 
         // GET: api/usuarios (lista de usuarios con roles distintos a 3)
         [HttpGet]
-        [Authorize(Roles = "Administrador")]
+        [Authorize(Roles = "Administrador")] // protección de endpoint, solo los admin tienen acceso
         public IActionResult GetUsuarios(
-            int page = 1,
-            int pageSize = 10,
-            string? nombre = null,
-            string? email = null,
-            string? telefono = null,
-            string? rolNombre = null,
-            bool? activo = null
-        )
+            int page = 1, // este es elvalor por defecto para la paginación, es decir que se inicia en la primera página
+            int pageSize = 10, // vamos a mostrar 10 usuarios por página
+            string? nombre = null, // el nombre puede q llegue por query string desde el frontend
+            string? email = null, // el email puede q llegue por query string desde el frontend
+            string? telefono = null, // el telefono puede q llegue por query string desde el frontend
+            string? rolNombre = null, // el rol puede q llegue por query string desde el frontend
+            bool? activo = null // el activo puede q llegue por query string desde el frontend
+        ) // se definen los parámetros de paginación y filtrado q se reciben por query string desde el frontend
         {
+            //aca lo q hago es traer todos los usuarios q no sean clientes, es decir con RolId distinto de 3
             var query = _context.Usuario.Include(u => u.Rol).Where(u => u.RolId != 3).AsQueryable();
 
-            // Ordenamiento
-            string? ordenarPor = HttpContext.Request.Query["ordenarPor"];
-            string? ordenarDesc = HttpContext.Request.Query["ordenDescendente"];
+            // esto es para filtrar por nombre, email, telefono, rol y activo
+            string? ordenarPor = HttpContext.Request.Query["ordenarPor"]; // se obtiene el parámetro de ordenamiento desde el query string
+            string? ordenarDesc = HttpContext.Request.Query["ordenDescendente"]; // se obtiene el parámetro de ordenamiento descendente desde el query string
             bool ordenarDescendente = ordenarDesc == "true";
 
-            if (!string.IsNullOrEmpty(ordenarPor))
+            if (!string.IsNullOrEmpty(ordenarPor)) // si el parámetro de ordenamiento no es nulo
             {
-                ordenarPor = ordenarPor.ToLower();
+                ordenarPor = ordenarPor.ToLower(); // convertimos a minuscula el parámetro de ordenamiento
                 query = ordenarPor switch
                 {
                     "nombre" => ordenarDescendente
@@ -72,10 +74,10 @@ namespace backend.Controllers
             }
             else
             {
-                query = query.OrderBy(u => u.Nombre);
+                query = query.OrderBy(u => u.Nombre); // si no llego nada, por default se ordena por nombre
             }
 
-            // Filtros
+            // Filtros por nombre, email, telefono, rol y activo
             if (!string.IsNullOrEmpty(nombre))
                 query = query.Where(u => u.Nombre!.Contains(nombre));
             if (!string.IsNullOrEmpty(email))
@@ -87,12 +89,12 @@ namespace backend.Controllers
             if (activo.HasValue)
                 query = query.Where(u => u.Activo == activo.Value);
 
-            var total = query.Count();
+            var total = query.Count(); // aca se obtiene el total de usuarios para la paginación
 
-            var data = query
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .Select(u => new UsuarioDto
+            var data = query // aca se hace la paginación
+                .Skip((page - 1) * pageSize) // .skip lo q hace es saltarse los primero 10 si estamos en la segunda pagina
+                .Take(pageSize) //.take lo q hace es tomar los siguientes 10
+                .Select(u => new UsuarioDto //aca vamos a crear una lista de objetos UsuarioDto con los datos q necesitamos
                 {
                     Id = u.Id,
                     Nombre = u.Nombre!,
@@ -102,7 +104,7 @@ namespace backend.Controllers
                     RolId = u.RolId,
                     RolNombre = u.Rol!.NombreRol,
                 })
-                .ToList();
+                .ToList(); // finalmente se convierte en una lista
 
             string mensaje =
                 total > 0

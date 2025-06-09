@@ -73,7 +73,7 @@
           <Column field="estado" header="Estado">
             <template #body="slotProps">
               <Tag
-                :value="slotProps.data.estado ? 'Completada' : 'Pendiente'"
+                :value="slotProps.data.estado ? 'Pagado' : 'Pendiente'"
                 :severity="slotProps.data.estado ? 'success' : 'warning'"
               />
             </template>
@@ -241,14 +241,25 @@ export default {
         this.ventas = res.data.ventas.map((venta) => {
           const pagos = venta.pagos || [];
           const montoPagado = pagos.reduce((acc, p) => acc + p.monto, 0);
+          const estado = montoPagado >= venta.totalVenta;
+
+          // Obtenemos el primer pago para mostrar el método
+          const primerPago = pagos.length > 0 ? pagos[0] : null;
+
           return {
             cliente: venta.clienteNombre,
             producto: venta.detalles.map((d) => d.nombreProducto).join(", "),
             fecha: new Date(venta.fechaAtencion).toLocaleDateString(),
-            estado: montoPagado >= venta.totalVenta,
+            estado,
             id: venta.atencionId,
             totalVenta: venta.totalVenta,
             montoPagado,
+            pago: primerPago
+              ? {
+                  metodoPago: primerPago.metodoPago,
+                  monto: primerPago.monto,
+                }
+              : null,
           };
         });
         this.totalVentas = res.data.pagination?.total || this.ventas.length;
@@ -321,6 +332,7 @@ export default {
               productoServicioId: d.productoServicioId ?? 0, // Evitamos valores `undefined`
               cantidad: d.cantidad ?? 1, // Asignamos un mínimo por seguridad
               precioUnitario: d.precioUnitario ?? 0.0, // Evitamos valores `undefined`
+              nombreProducto: d.nombreProducto ?? "Producto sin nombre",
             })),
             total: data.totalVenta ?? 0.0, // Evitamos valores `undefined`
           };
@@ -363,12 +375,7 @@ export default {
               Subtotal: d.subtotal,
             })),
             TotalVenta: data.totalVenta,
-            Pago: data.pago
-              ? {
-                  MetodoPago: data.pago.metodoPago,
-                  Monto: data.pago.monto,
-                }
-              : null,
+            Pagos: data.pagos || [],
             AtencionId: atencionId,
           };
           this.mostrarDetalleModal = true;
@@ -482,8 +489,8 @@ export default {
         input: "select",
         inputOptions: {
           Efectivo: "Efectivo",
-          "Transferencia - Mercado Pago": "Transferencia - Mercado Pago",
-          "Transferencia - NaranjaX": "Transferencia - NaranjaX",
+          MercadoPago: "Transferencia - Mercado Pago",
+          NaranjaX: "Transferencia - NaranjaX",
         },
         inputPlaceholder: "Seleccione método de pago",
         showCancelButton: true,

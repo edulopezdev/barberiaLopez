@@ -75,7 +75,6 @@ namespace backend.Controllers
         }
 
         // GET: api/detalleatencion/ventas
-        // GET: api/detalleatencion/ventas
         [HttpGet("ventas")]
         public async Task<IActionResult> GetVentas(int page = 1, int pageSize = 10)
         {
@@ -89,9 +88,10 @@ namespace backend.Controllers
             var totalVentas = await query.CountAsync();
 
             var atenciones = await query
+                .OrderByDescending(a => a.Fecha)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
-                .AsNoTracking()
+                .AsNoTracking() // esto es para evitar nulls, EF puede rastrear objetos, con esto lo evitamos
                 .ToListAsync();
 
             var atencionIds = atenciones.Select(a => a.Id).ToList();
