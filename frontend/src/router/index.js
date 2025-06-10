@@ -63,7 +63,6 @@ const routes = [
     component: UsuariosView,
     meta: { requiresAuth: true, requiredRole: "Administrador" },
   },
-  ,
   {
     path: "/perfil",
     name: "Perfil",

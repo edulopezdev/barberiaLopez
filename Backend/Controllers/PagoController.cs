@@ -517,5 +517,114 @@ namespace backend.Controllers
                 );
             }
         }
+
+        // GET: api/pago/facturacion-mes
+        [HttpGet("facturacion-mes")]
+        public IActionResult GetFacturacionPorMes(int anio, int mes)
+        {
+            try
+            {
+                // Validar mes y año válidos
+                if (mes < 1 || mes > 12)
+                    return BadRequest(new { status = 400, message = "Mes inválido." });
+
+                if (anio < 2000 || anio > DateTime.Now.Year)
+                    return BadRequest(new { status = 400, message = "Año inválido." });
+
+                // Rango de fechas para el mes especificado
+                var fechaInicio = new DateTime(anio, mes, 1);
+                var fechaFin = fechaInicio.AddMonths(1).AddDays(-1);
+
+                // Obtenemos los pagos del mes (fecha entre inicio y fin)
+                var pagosDelMes = _context
+                    .Pagos.Include(p => p.Atencion)
+                    .Where(p => p.Fecha.Date >= fechaInicio.Date && p.Fecha.Date <= fechaFin.Date)
+                    .ToList();
+
+                // Si no hay pagos, devolvemos respuesta adecuada
+                if (!pagosDelMes.Any())
+                {
+                    return Ok(
+                        new
+                        {
+                            status = 200,
+                            message = "No se registraron pagos en el mes indicado.",
+                            facturacion = new { },
+                        }
+                    );
+                }
+
+                // Agrupamos los pagos por método de pago y sumamos los montos
+                var porMetodo = pagosDelMes
+                    .GroupBy(p => p.MetodoPago)
+                    .Select(g => new { metodo = g.Key.ToString(), total = g.Sum(p => p.Monto) })
+                    .ToList();
+
+                // Calculamos el total de todos los pagos del mes
+                var facturacionTotal = pagosDelMes.Sum(p => p.Monto);
+
+                // Obtenemos los detalles de atención para calcular productos y servicios
+                var atencionIds = pagosDelMes.Select(p => p.AtencionId).Distinct().ToList();
+                var totalAtenciones = atencionIds.Count; // 👈 Nuevo dato agregado
+
+                var detalles = _context
+                    .DetalleAtencion.Include(d => d.ProductoServicio)
+                    .Where(d => atencionIds.Contains(d.AtencionId))
+                    .ToList();
+
+                // Calculamos el total de servicios (productos no almacenables)
+                var servicios = detalles
+                    .Where(d =>
+                        d.ProductoServicio != null
+                        && d.ProductoServicio.EsAlmacenable.HasValue
+                        && !d.ProductoServicio.EsAlmacenable.Value
+                    )
+                    .Sum(d => d.Cantidad * d.PrecioUnitario);
+
+                // Calculamos el total de productos (productos almacenables)
+                var productos = detalles
+                    .Where(d =>
+                        d.ProductoServicio != null
+                        && d.ProductoServicio.EsAlmacenable.HasValue
+                        && d.ProductoServicio.EsAlmacenable.Value
+                    )
+                    .Sum(d => d.Cantidad * d.PrecioUnitario);
+
+                // Devolvemos los resultados, agregando la conclusión final
+                return Ok(
+                    new
+                    {
+                        status = 200,
+                        message = $"Facturación del mes {mes}/{anio} obtenida correctamente.",
+                        mes = mes,
+                        anio = anio,
+                        facturacionTotal = facturacionTotal,
+                        totalAtenciones = totalAtenciones, // 👈 Nuevo campo en la respuesta
+                        servicios = new { total = servicios },
+                        productos = new { total = productos },
+                        metodoPago = porMetodo,
+                        conclusion = new
+                        {
+                            totalEnCortes = servicios,
+                            totalEnVentas = productos,
+                            recaudacionDelMes = facturacionTotal,
+                        },
+                    }
+                );
+            }
+            catch (Exception ex)
+            {
+                // Si ocurre un error, devolvemos el error en el servidor
+                return StatusCode(
+                    500,
+                    new
+                    {
+                        status = 500,
+                        message = "Error interno en el servidor",
+                        error = ex.Message,
+                    }
+                );
+            }
+        }
     }
 }
