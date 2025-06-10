@@ -114,16 +114,18 @@
                   @click="editarCliente(slotProps.data)"
                 />
                 <Button
+                  v-if="esAdministrador"
                   :icon="
-                    slotProps.data.activo ? 'pi pi-trash' : 'pi pi-refresh'
+                    slotProps.data.activo
+                      ? 'pi pi-user-minus'
+                      : 'pi pi-user-plus'
                   "
                   :severity="slotProps.data.activo ? 'danger' : 'success'"
                   text
                   rounded
-                  :label="slotProps.data.activo ? '' : ''"
-                  :v-tooltip.bottom="
+                  v-tooltip.bottom="
                     slotProps.data.activo
-                      ? 'Eliminar cliente'
+                      ? 'Desactivar cliente'
                       : 'Reactivar cliente'
                   "
                   @click="
@@ -191,6 +193,8 @@ import Dialog from "primevue/dialog";
 import ClienteForm from "../components/ClienteForm.vue";
 import ClienteDetalle from "../components/ClienteDetalle.vue";
 import Swal from "sweetalert2";
+import authService from "../services/auth.service";
+
 
 export default {
   components: {
@@ -204,6 +208,11 @@ export default {
     Dialog,
     ClienteForm,
     ClienteDetalle,
+  },
+  computed: {
+    esAdministrador() {
+      return authService.getUserRole() === "Administrador";
+    },
   },
   data() {
     return {
@@ -236,7 +245,6 @@ export default {
   methods: {
     // Modal: nuevo cliente
     abrirModalNuevo(cliente = null) {
-
       // Si se pasa un cliente (como al reabrir tras error), se mantiene ese objeto
       this.clienteSeleccionado = cliente
         ? { ...cliente } // aca se copia el objeto
@@ -387,13 +395,13 @@ export default {
 
     eliminarCliente(cliente) {
       Swal.fire({
-        title: `¿Eliminar a ${cliente.nombre}?`,
-        text: "Esta acción no se puede deshacer.",
+        title: `¿Desactivar a ${cliente.nombre}?`,
+        text: "Esta acción siempre se puede revertir",
         icon: "warning",
         showCancelButton: true,
         confirmButtonColor: "#e74c3c",
         cancelButtonColor: "#6c757d",
-        confirmButtonText: "Sí, eliminar",
+        confirmButtonText: "Sí, desactivar",
         cancelButtonText: "Cancelar",
         background: "#18181b",
         color: "#fff",

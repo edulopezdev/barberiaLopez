@@ -137,16 +137,14 @@
                       !slotProps.data.activo)
                   "
                   :icon="
-                    slotProps.data.activo ? 'pi pi-trash' : 'pi pi-refresh'
+                    slotProps.data.activo ? 'pi pi-user-minus' : 'pi pi-user-plus'
                   "
                   :severity="slotProps.data.activo ? 'danger' : 'success'"
                   text
                   rounded
-                  :v-tooltip.bottom="
-                    slotProps.data.activo
-                      ? 'Eliminar usuario'
-                      : 'Reactivar usuario'
-                  "
+                  v-tooltip.bottom=" slotProps.data.activo
+                      ? 'Desactivar usuario'
+                      : 'Reactivar usuario'"
                   @click="
                     slotProps.data.activo
                       ? eliminarUsuario(slotProps.data)
@@ -288,13 +286,13 @@ export default {
     },
     eliminarUsuario(usuario) {
       Swal.fire({
-        title: `¿Eliminar a ${usuario.nombre}?`,
-        text: "Esta acción no se puede deshacer.",
+        title: `¿Desactivar a ${usuario.nombre}?`,
+        text: "Esta acción siempre se puede revertir",
         icon: "warning",
         showCancelButton: true,
         confirmButtonColor: "#e74c3c",
         cancelButtonColor: "#6c757d",
-        confirmButtonText: "Sí, eliminar",
+        confirmButtonText: "Sí, desactivar",
         cancelButtonText: "Cancelar",
         background: "#18181b",
         color: "#fff",
@@ -318,7 +316,7 @@ export default {
               // Extraer mensaje personalizado del backend o fallback
               const backendMessage =
                 error?.response?.data?.message ||
-                "No se pudo eliminar el usuario.";
+                "No se pudo desactivar el usuario.";
 
               Swal.fire({
                 title: "Error",

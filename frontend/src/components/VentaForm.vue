@@ -471,18 +471,15 @@ label {
   width: 100% !important;
 }
 
-.auto-complete-fullwidth ::v-deep .p-autocomplete-input {
-  width: 100% !important;
-  box-sizing: border-box;
-}
 .auto-complete-fullwidth {
   width: 100% !important;
 }
 
-.auto-complete-fullwidth ::v-deep .p-autocomplete-input {
+.auto-complete-fullwidth :deep(.p-autocomplete-input) {
   width: 100% !important;
   box-sizing: border-box;
 }
+
 .boton-cantidad {
   display: flex;
   align-items: center;

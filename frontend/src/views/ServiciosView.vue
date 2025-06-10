@@ -175,13 +175,14 @@
     <!-- Detalle (opcional por ahora) -->
     <Dialog
       v-model:visible="mostrarDetalleModal"
-      header="Detalle del Servicio"
+      header="Servicios"
       :modal="true"
       :closable="false"
       style="width: 450px"
     >
       <ProductoServicioDetalle
         :producto="servicioSeleccionado"
+        :esServicio="true"
         @cerrar="mostrarDetalleModal = false"
       />
     </Dialog>

@@ -1,6 +1,9 @@
 <template>
   <div class="detalle-producto">
-    <h3 class="titulo"><i class="pi pi-box"></i> Detalle del Producto</h3>
+    <h3 class="titulo">
+      <i :class="esServicio ? 'pi pi-cog' : 'pi pi-box'"></i>
+      Detalle del {{ esServicio ? "Servicio" : "Producto" }}
+    </h3>
 
     <!-- Sección: Nombre y Descripción -->
     <div class="seccion">
@@ -22,22 +25,9 @@
         <p>{{ formatoPrecio(producto?.precio) }}</p>
       </div>
 
-      <div class="campo">
+      <div class="campo" v-if="!esServicio">
         <label><i class="pi pi-inbox"></i> Cantidad en stock</label>
         <p>{{ producto?.cantidad }}</p>
-      </div>
-    </div>
-
-    <!-- Sección: Fechas -->
-    <div class="seccion">
-      <div class="campo">
-        <label><i class="pi pi-calendar-plus"></i> Fecha de registro</label>
-        <p>{{ formatearFecha(producto?.fechaRegistro) }}</p>
-      </div>
-
-      <div class="campo">
-        <label><i class="pi pi-refresh"></i> Última modificación</label>
-        <p>{{ formatearFecha(producto?.fechaModificacion) }}</p>
       </div>
     </div>
 
@@ -78,6 +68,10 @@ export default {
     producto: {
       type: Object,
       required: true,
+    },
+    esServicio: {
+      type: Boolean,
+      default: false,
     },
   },
   emits: ["cerrar"],

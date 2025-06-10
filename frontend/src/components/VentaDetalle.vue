@@ -19,10 +19,16 @@
       <label><i class="pi pi-credit-card"></i> Pagos Realizados</label>
       <div v-if="venta?.Pagos?.length">
         <Tag v-for="pago in venta.Pagos" :key="pago.pagoId" severity="success">
-          {{ pago.metodoPago }} - ${{ pago.monto.toFixed(2) }}
+          {{ pago.metodoPago }} -
+          {{
+            new Intl.NumberFormat("es-MX", {
+              style: "currency",
+              currency: "MXN",
+            }).format(pago.monto)
+          }}
         </Tag>
       </div>
-      <Tag v-else severity="warning">Pendiente</Tag>
+      <Tag v-else severity="warning">Sin pagos realizados</Tag>
     </div>
 
     <!-- Detalles de productos/servicios -->
@@ -59,7 +65,10 @@
 
       <div class="campo">
         <label><i class="pi pi-credit-card"></i> Estado del Pago</label>
-        <Tag v-if="venta?.Pagos?.length" severity="success">
+        <Tag
+          v-if="venta?.Pagos?.length"
+          :severity="totalPagado >= venta.TotalVenta ? 'success' : 'info'"
+        >
           {{ totalPagado >= venta.TotalVenta ? "Completada" : "Parcial" }}
         </Tag>
         <Tag v-else severity="warning">Pendiente</Tag>

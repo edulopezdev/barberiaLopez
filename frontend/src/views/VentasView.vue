@@ -67,7 +67,12 @@
           </Column>
           <Column field="montoPagado" header="Monto Total" sortable>
             <template #body="slotProps">
-              ${{ slotProps.data.montoPagado?.toFixed(2) || "0.00" }}
+              {{
+                new Intl.NumberFormat("es-AR", {
+                  style: "currency",
+                  currency: "ARS",
+                }).format(slotProps.data.montoPagado || 0)
+              }}
             </template>
           </Column>
           <Column field="estado" header="Estado">
@@ -75,6 +80,7 @@
               <Tag
                 :value="slotProps.data.estado ? 'Pagado' : 'Pendiente'"
                 :severity="slotProps.data.estado ? 'success' : 'warning'"
+                class="estado-etiqueta"
               />
             </template>
             <template #filter="{ filterModel, filterCallback }">
@@ -102,14 +108,28 @@
                   v-tooltip.bottom="'Ver detalles'"
                   @click="verDetalles(slotProps.data)"
                 />
-                <Button
-                  icon="pi pi-pencil"
-                  severity="warning"
-                  text
-                  rounded
-                  v-tooltip.bottom="'Editar venta'"
-                  @click="editarVenta(slotProps.data)"
-                />
+                <span
+                  v-if="slotProps.data.estado"
+                  v-tooltip.bottom="'Venta completada, no se puede editar'"
+                >
+                  <Button
+                    icon="pi pi-pencil"
+                    severity="warning"
+                    text
+                    rounded
+                    disabled
+                  />
+                </span>
+                <span v-else>
+                  <Button
+                    icon="pi pi-pencil"
+                    severity="warning"
+                    text
+                    rounded
+                    v-tooltip.bottom="'Editar venta'"
+                    @click="editarVenta(slotProps.data)"
+                  />
+                </span>
                 <!-- Botón pagar si está pendiente -->
                 <Button
                   v-if="!slotProps.data.estado"
@@ -134,7 +154,6 @@
             </template>
           </Column>
         </DataTable>
-
         <!-- Mensaje de cantidad total -->
         <div class="total-ventas" v-if="totalVentas > 0">
           Total de ventas registradas: {{ totalVentas }}
@@ -176,6 +195,56 @@
         :venta="ventaSeleccionada"
         @cerrar="mostrarDetalleModal = false"
       />
+    </Dialog>
+
+    <!-- Modal Registrar Pago -->
+    <Dialog
+      v-model:visible="mostrarPagarModal"
+      header="Registrar Pago"
+      :modal="true"
+      :closable="false"
+      style="width: 400px"
+    >
+      <div class="formulario-pago">
+        <label for="metodo">Método de pago</label>
+        <Dropdown
+          id="metodo"
+          v-model="pagoForm.metodo"
+          :options="opcionesMetodoPago"
+          optionLabel="nombre"
+          optionValue="valor"
+          placeholder="Seleccione método"
+          class="mb-3 w-full"
+        />
+
+        <label :for="'monto'">
+          Monto a pagar (pendiente: {{ formatoMoneda(pagoForm.pendiente) }})
+        </label>
+        <InputText
+          v-model="pagoForm.monto"
+          type="text"
+          placeholder="Ingrese monto"
+          @input="validarMonto"
+          class="w-full mb-2"
+        />
+        <small v-if="montoInvalido" class="p-error">{{ mensajeError }}</small>
+
+        <div class="acciones-modal mt-4 flex justify-content-between">
+          <Button
+            label="Cancelar"
+            icon="pi pi-times"
+            severity="secondary"
+            text
+            @click="cerrarPagarModal"
+          />
+          <Button
+            label="Registrar Pago"
+            icon="pi pi-check"
+            @click="registrarPago"
+            :disabled="montoInvalido || !pagoForm.metodo"
+          />
+        </div>
+      </div>
     </Dialog>
   </div>
 </template>
@@ -220,8 +289,22 @@ export default {
       loading: false,
       mostrarFiltros: false,
       mostrarModal: false,
-      ventaSeleccionada: null, // Aquí se guarda el objeto completo
       mostrarDetalleModal: false,
+      mostrarPagarModal: false,
+      ventaSeleccionada: null,
+      ventaSeleccionadaParaPago: null,
+      pagoForm: {
+        metodo: "",
+        monto: "",
+        pendiente: 0,
+      },
+      montoInvalido: false,
+      mensajeError: "",
+      opcionesMetodoPago: [
+        { nombre: "Efectivo", valor: "Efectivo" },
+        { nombre: "MercadoPago", valor: "MercadoPago" },
+        { nombre: "NaranjaX", valor: "NaranjaX" },
+      ],
       filters: {
         cliente: { value: null, matchMode: FilterMatchMode.CONTAINS },
         producto: { value: null, matchMode: FilterMatchMode.CONTAINS },
@@ -242,10 +325,7 @@ export default {
           const pagos = venta.pagos || [];
           const montoPagado = pagos.reduce((acc, p) => acc + p.monto, 0);
           const estado = montoPagado >= venta.totalVenta;
-
-          // Obtenemos el primer pago para mostrar el método
           const primerPago = pagos.length > 0 ? pagos[0] : null;
-
           return {
             cliente: venta.clienteNombre,
             producto: venta.detalles.map((d) => d.nombreProducto).join(", "),
@@ -304,39 +384,34 @@ export default {
         );
         return;
       }
-
       this.loading = true;
       VentaService.getVentaById(venta.id)
         .then((res) => {
           const data = res.data.venta;
-
           if (!data.clienteId || data.clienteId <= 0) {
             console.warn("ClienteId inválido o faltante:", data);
             Swal.fire("Error", "Cliente inválido o no encontrado.", "error");
             return;
           }
-
           if (!Array.isArray(data.detalles)) {
             console.warn("Detalles de venta inválidos o faltantes:", data);
             Swal.fire("Error", "Detalles de venta no encontrados.", "error");
             return;
           }
-
           this.ventaSeleccionada = {
             id: data.atencionId,
             cliente: {
-              id: data.clienteId, // Aseguramos que ClienteId venga del backend
-              nombre: data.clienteNombre, // Aseguramos que ClienteNombre también se pase
+              id: data.clienteId,
+              nombre: data.clienteNombre,
             },
             detalles: data.detalles.map((d) => ({
-              productoServicioId: d.productoServicioId ?? 0, // Evitamos valores `undefined`
-              cantidad: d.cantidad ?? 1, // Asignamos un mínimo por seguridad
-              precioUnitario: d.precioUnitario ?? 0.0, // Evitamos valores `undefined`
+              productoServicioId: d.productoServicioId ?? 0,
+              cantidad: d.cantidad ?? 1,
+              precioUnitario: d.precioUnitario ?? 0.0,
               nombreProducto: d.nombreProducto ?? "Producto sin nombre",
             })),
-            total: data.totalVenta ?? 0.0, // Evitamos valores `undefined`
+            total: data.totalVenta ?? 0.0,
           };
-
           this.mostrarModal = true;
           document.body.classList.add("modal-open");
         })
@@ -388,151 +463,121 @@ export default {
           );
         });
     },
-    async guardarVenta(datosVenta) {
-      this.cerrarModal();
-
-      const mensaje = datosVenta.id
-        ? `¿Actualizar venta de ${datosVenta.cliente?.nombre || "Cliente"}?`
-        : "¿Registrar nueva venta?";
-
-      const result = await Swal.fire({
-        title: mensaje,
-        icon: "question",
-        showCancelButton: true,
-        confirmButtonColor: "#3085d6",
-        cancelButtonColor: "#6c757d",
-        confirmButtonText: "Sí, confirmar",
-        cancelButtonText: "Cancelar",
-        background: "#18181b",
-        color: "#fff",
-      });
-
-      if (!result.isConfirmed) {
-        this.abrirModalConDatos(datosVenta);
+    guardarVenta(data) {
+      if (!data.cliente || !data.detalles || data.detalles.length === 0) {
+        Swal.fire(
+          "Error",
+          "Debe seleccionar un cliente y al menos un producto.",
+          "error"
+        );
         return;
       }
 
-      try {
-        let response;
+      const payload = {
+        clienteId: data.cliente.id,
+        detalles: data.detalles.map((d) => ({
+          productoServicioId: d.productoServicioId,
+          cantidad: d.cantidad,
+          precioUnitario: d.precioUnitario,
+        })),
+      };
 
-        if (datosVenta.id) {
-          // Actualizar venta existente (PUT)
-          response = await VentaService.actualizarVenta(datosVenta.id, {
-            clienteId: datosVenta.cliente.id,
-            barberoId: datosVenta.barbero.id,
-            fechaAtencion: datosVenta.fechaAtencion,
-            total: datosVenta.total,
-            detalles: datosVenta.detalles.map((d) => ({
-              productoServicioId: d.productoServicioId || d.id,
-              cantidad: d.cantidad,
-              precioUnitario: d.precioUnitario,
-            })),
+      VentaService.crearVenta(payload)
+        .then(() => {
+          Swal.fire({
+            icon: "success",
+            title: "Venta registrada",
+            background: "#18181b",
+            color: "#fff",
+            timer: 2000,
+            showConfirmButton: false,
           });
-        } else {
-          // Crear nueva venta (POST)
-          response = await VentaService.crearVenta({
-            clienteId: datosVenta.cliente.id,
-            total: datosVenta.total,
-            detalles: datosVenta.detalles.map((d) => ({
-              productoServicioId: d.productoServicioId || d.id,
-              cantidad: d.cantidad,
-              precioUnitario: d.precioUnitario,
-            })),
-          });
-        }
-
-        await Swal.fire({
-          title: "Éxito",
-          text: `Venta ${
-            datosVenta.id ? "actualizada" : "creada"
-          } correctamente.`,
-          icon: "success",
-          timer: 2000,
-          showConfirmButton: false,
-          background: "#18181b",
-          color: "#fff",
+          this.cerrarModal();
+          this.obtenerVentas(this.currentPage, this.pageSize);
+        })
+        .catch((err) => {
+          console.error("Error al guardar venta:", err);
+          Swal.fire("Error", "No se pudo registrar la venta.", "error");
         });
-
-        this.obtenerVentas(this.currentPage, this.pageSize);
-        this.cerrarModal();
-      } catch (error) {
-        console.error("Error al guardar la venta:", error);
-
-        const backendMessage =
-          error?.response?.data?.message ||
-          "Hubo un error al guardar la venta.";
-
-        await Swal.fire({
-          title: "Error",
-          text: backendMessage,
-          icon: "error",
-          background: "#18181b",
-          color: "#fff",
-        });
-
-        this.abrirModalConDatos(datosVenta); // Reabre con datos anteriores
-      }
-    },
-    abrirModalConDatos(datosVenta) {
-      if (!datosVenta || !datosVenta.cliente) {
-        console.warn("Datos incompletos al reabrir modal", datosVenta);
-        return;
-      }
-
-      this.ventaSeleccionada = JSON.parse(JSON.stringify(datosVenta));
-      this.mostrarModal = true;
-      document.body.classList.add("modal-open");
     },
     pagarDialog(venta) {
-      Swal.fire({
-        title: `Registrar pago de $${venta.totalVenta}?`,
-        input: "select",
-        inputOptions: {
-          Efectivo: "Efectivo",
-          MercadoPago: "Transferencia - Mercado Pago",
-          NaranjaX: "Transferencia - NaranjaX",
-        },
-        inputPlaceholder: "Seleccione método de pago",
-        showCancelButton: true,
-        confirmButtonText: "Registrar Pago",
-        cancelButtonText: "Cancelar",
-        background: "#18181b",
-        color: "#fff",
-      }).then((result) => {
-        if (result.isConfirmed && result.value) {
-          const nuevoPago = {
-            atencionId: venta.id,
-            metodoPago: result.value,
-            monto: venta.totalVenta,
-            fecha: new Date().toISOString(),
-          };
-          VentaService.RegistrarPago(nuevoPago)
-            .then(() => {
-              Swal.fire({
-                icon: "success",
-                title: "Pago registrado",
-                text: `Método: ${result.value}`,
-                background: "#18181b",
-                color: "#fff",
-                timer: 2000,
-                showConfirmButton: false,
-              });
-              setTimeout(() => {
-                this.obtenerVentas(this.currentPage, this.pageSize);
-              }, 500);
-            })
-            .catch((error) => {
-              console.error("Error al registrar el pago:", error);
-              Swal.fire({
-                icon: "error",
-                title: "Error",
-                text: "No se pudo registrar el pago.",
-                background: "#18181b",
-                color: "#fff",
-              });
-            });
-        }
-      });
+      const pendiente = venta.totalVenta - (venta.montoPagado || 0);
+      this.ventaSeleccionadaParaPago = venta;
+      this.pagoForm = {
+        metodo: "",
+        monto: pendiente.toFixed(2),
+        pendiente: pendiente,
+      };
+      this.montoInvalido = false;
+      this.mensajeError = "";
+      this.mostrarPagarModal = true;
+    },
+    validarMonto() {
+      const monto = parseFloat(this.pagoForm.monto);
+      if (isNaN(monto) || monto <= 0) {
+        this.montoInvalido = true;
+        this.mensajeError = "Ingrese un monto válido mayor a cero.";
+        return;
+      }
+      if (monto > this.pagoForm.pendiente) {
+        this.montoInvalido = true;
+        this.mensajeError = `El monto no puede superar $${this.pagoForm.pendiente.toFixed(
+          2
+        )}.`;
+        return;
+      }
+      this.montoInvalido = false;
+      this.mensajeError = "";
+    },
+    async registrarPago() {
+      this.validarMonto();
+      if (this.montoInvalido || !this.pagoForm.metodo) return;
+
+      const nuevoPago = {
+        atencionId: this.ventaSeleccionadaParaPago.id,
+        metodoPago: this.pagoForm.metodo,
+        monto: parseFloat(this.pagoForm.monto),
+        fecha: new Date().toISOString(),
+      };
+
+      try {
+        await VentaService.RegistrarPago(nuevoPago);
+        this.cerrarPagarModal();
+        this.obtenerVentas(this.currentPage, this.pageSize);
+
+        // Notificación de éxito
+        Swal.fire({
+          icon: "success",
+          title: "Pago registrado",
+          text: `Método: ${
+            nuevoPago.metodoPago
+          }, Monto: $${nuevoPago.monto.toFixed(2)}`,
+          background: "#18181b",
+          color: "#fff",
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      } catch (error) {
+        console.error("Error al registrar pago:", error);
+        Swal.fire("Error", "No se pudo registrar el pago.", "error");
+      }
+    },
+    cerrarPagarModal() {
+      this.mostrarPagarModal = false;
+      this.ventaSeleccionadaParaPago = null;
+      this.pagoForm = {
+        metodo: "",
+        monto: "",
+        pendiente: 0,
+      };
+      this.montoInvalido = false;
+      this.mensajeError = "";
+    },
+    formatoMoneda(valor) {
+      return new Intl.NumberFormat("es-AR", {
+        style: "currency",
+        currency: "ARS",
+      }).format(valor);
     },
   },
 };
@@ -853,5 +898,34 @@ export default {
   justify-content: center;
   align-items: center;
   height: 30px;
+}
+
+/* Estilos para formulario de pago */
+.formulario-pago {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.mb-2 {
+  margin-bottom: 0.5rem;
+}
+.mb-3 {
+  margin-bottom: 1rem;
+}
+.w-full {
+  width: 100%;
+}
+.acciones-modal {
+  margin-top: 1rem;
+}
+.estado-etiqueta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 80px; /* Mismo tamaño para ambos */
+  padding: 0.25rem 0.5rem !important; /* Padding uniforme */
+  font-size: 0.85rem !important; /* Tamaño de texto igual */
+  border-radius: 12px !important; /* Bordes consistentes */
+  text-align: center;
 }
 </style>

@@ -180,7 +180,7 @@
     <!-- Detalle (opcional por ahora) -->
     <Dialog
       v-model:visible="mostrarDetalleModal"
-      header="Detalle del Producto"
+      header="Productos"
       :modal="true"
       :closable="false"
       style="width: 450px"

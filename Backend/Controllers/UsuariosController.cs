@@ -680,7 +680,7 @@ namespace backend.Controllers
 
         // PATCH: api/usuarios/{id}/estado
         [HttpPatch("{id}/estado")]
-        [Authorize(Roles = "Administrador")]
+        [Authorize(Roles = "Administrador,Barbero")]
         public async Task<IActionResult> CambiarEstadoUsuario(
             int id,
             [FromBody] CambiarEstadoDto dto
