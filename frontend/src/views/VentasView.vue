@@ -235,6 +235,7 @@
             icon="pi pi-times"
             severity="secondary"
             text
+            class="p-button p-button-danger"
             @click="cerrarPagarModal"
           />
           <Button
@@ -511,6 +512,8 @@ export default {
       this.montoInvalido = false;
       this.mensajeError = "";
       this.mostrarPagarModal = true;
+      document.body.style.paddingRight = "15px";
+      document.body.classList.add("modal-open");
     },
     validarMonto() {
       const monto = parseFloat(this.pagoForm.monto);
@@ -572,6 +575,8 @@ export default {
       };
       this.montoInvalido = false;
       this.mensajeError = "";
+      document.body.classList.remove("modal-open");
+      document.body.style.paddingRight = "";
     },
     formatoMoneda(valor) {
       return new Intl.NumberFormat("es-AR", {
@@ -928,4 +933,5 @@ export default {
   border-radius: 12px !important; /* Bordes consistentes */
   text-align: center;
 }
+
 </style>

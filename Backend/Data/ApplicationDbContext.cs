@@ -3,9 +3,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace backend.Data
 {
-    public class ApplicationDbContext : DbContext
+    public class ApplicationDbContext : DbContext // Heredar de DbContext
     {
-        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) // este es el constructor
             : base(options) { }
 
         // Mapeo de entidades con los nombres correctos según la base de datos
@@ -19,7 +19,7 @@ namespace backend.Data
         public DbSet<Rol> Rol { get; set; }
         public DbSet<Pago> Pagos { get; set; }
 
-        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        protected override void OnModelCreating(ModelBuilder modelBuilder) //aca se mapean las entidades con sus respectivas tablas
         {
             base.OnModelCreating(modelBuilder);
 
@@ -36,10 +36,10 @@ namespace backend.Data
 
             // Configuración de relaciones para `Pago`
             modelBuilder
-                .Entity<Pago>()
-                .HasOne(p => p.Atencion)
+                .Entity<Pago>() // Configuración de relaciones para `Pago`
+                .HasOne(p => p.Atencion) // Una Pago pertenece a una Atención
                 .WithMany() // Una Atención puede tener múltiples pagos (pagos parciales)
-                .HasForeignKey(p => p.AtencionId)
+                .HasForeignKey(p => p.AtencionId) // La clave externa es el AtencionId
                 .OnDelete(DeleteBehavior.Cascade); // Asegúrate de que esta política de eliminación es la que deseas
 
             // Configuración del Enum `MetodoPago` para almacenarse como `string`

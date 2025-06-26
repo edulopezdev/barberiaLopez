@@ -16,10 +16,10 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(args); // aca lo q se hace es crear la instancia de la app
 
-builder.Logging.ClearProviders();
-builder.Logging.AddConsole();
+builder.Logging.ClearProviders(); // esto es para limpiar los proveedores de logging
+builder.Logging.AddConsole(); // esto es para agregar el proveedor de logging de consola
 
 builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Warning); // solo warnings+ comandos SQL
 builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Query", LogLevel.Error); // oculta warnings de query (como Skip/Take sin OrderBy)
@@ -29,7 +29,7 @@ builder.Logging.AddFilter("System", LogLevel.Warning); // System en general, sol
 
 builder.Logging.SetMinimumLevel(LogLevel.Information); // para tu código, info+
 
-// Servicios
+//--- Servicios ---//
 
 // Configurar CORS antes de construir la aplicación
 var corsPolicy = "_myAllowSpecificOrigins";
@@ -186,7 +186,7 @@ app.MapGet(
     .WithName("GetWeatherForecast")
     .WithOpenApi();
 
-app.MapControllers();
+app.MapControllers(); // esto es para habilitar los enroutadores de los controladores
 app.Run();
 
 record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)

@@ -19,55 +19,56 @@ namespace backend.Controllers
         }
 
         // GET: api/productosservicios (Obtener todos los productos)
-        [HttpGet("almacenables")]
-        [Authorize(Roles = "Administrador,Barbero")]
-        public IActionResult GetProductosAlmacenables(
-            int page = 1,
-            int pageSize = 10,
-            string? sort = null,
-            string? order = null,
-            string? nombre = null,
-            string? descripcion = null,
-            decimal? precio = null,
-            int? cantidad = null
+        [HttpGet("almacenables")] // get de productos almacenables
+        [Authorize(Roles = "Administrador,Barbero")] // perfiles autorizados: Administrador, Barbero
+        public IActionResult GetProductosAlmacenables( // método para obtener los productos almacenables
+            int page = 1, // aca indicamos que la paginación comienza en la página 1
+            int pageSize = 10, // aca indicamos que se muestran 10 productos por página
+            string? sort = null, // aca permitimos elegir el campo por el que se ordena
+            string? order = null, // aca permitimos elegir el orden ascendente o descendente
+            string? nombre = null, // este filtro permite buscar productos por su nombre
+            string? descripcion = null, // este filtro permite buscar productos por su descripción
+            decimal? precio = null, // este filtro permite buscar productos por su precio
+            int? cantidad = null // este filtro permite buscar productos por su cantidad
         )
         {
+            // creamos una consulta inicial para obtener los productos almacenables que esten activos
             var query = _context.ProductosServicios.Where(p => p.Activo && p.EsAlmacenable == true);
 
             // Filtros seguros
-            if (!string.IsNullOrEmpty(nombre))
+            if (!string.IsNullOrEmpty(nombre)) // verificamos si el nombre no está vacío
             {
                 query = query.Where(p =>
                     !string.IsNullOrEmpty(p.Nombre) && p.Nombre.Contains(nombre)
-                );
+                ); // si el nombre no está vacío, se agrega a la consulta
             }
 
-            if (!string.IsNullOrEmpty(descripcion))
+            if (!string.IsNullOrEmpty(descripcion)) // verificamos si la descripción no está vacía
             {
                 query = query.Where(p =>
                     !string.IsNullOrEmpty(p.Descripcion) && p.Descripcion.Contains(descripcion)
-                );
+                ); // si la descripción no está vacía, se agrega a la consulta
             }
 
-            if (precio.HasValue && precio.Value > 0)
+            if (precio.HasValue && precio.Value > 0) // verificamos si el precio es válido y mayor que cero
             {
-                query = query.Where(p => p.Precio == precio.Value);
+                query = query.Where(p => p.Precio == precio.Value); // si el precio es válido y mayor que cero, se agrega a la consulta
             }
 
-            if (cantidad.HasValue && cantidad.Value >= 0)
+            if (cantidad.HasValue && cantidad.Value >= 0) // verificamos si la cantidad es válida y mayor o igual a cero
             {
-                query = query.Where(p => p.Cantidad == cantidad.Value);
+                query = query.Where(p => p.Cantidad == cantidad.Value); // si la cantidad es válida y mayor o igual a cero, se agrega a la consulta
             }
 
             // Ordenamiento seguro
-            switch (sort?.ToLower())
+            switch (sort?.ToLower()) // usamos switch para elegir el campo por el que se ordena, con ToLower() hacemos que sea insensible a mayúsculas y minúsculas
             {
-                case "nombre":
+                case "nombre": // si el campo por el que se ordena es "nombre"
                     query =
                         order == "desc"
-                            ? query.OrderByDescending(p => p.Nombre)
-                            : query.OrderBy(p => p.Nombre);
-                    break;
+                            ? query.OrderByDescending(p => p.Nombre) // si el orden es descendente, se ordena de manera descendente
+                            : query.OrderBy(p => p.Nombre); // si el orden es ascendente, se ordena de manera ascendente
+                    break; // se sale del switch
 
                 case "precio":
                     query =
@@ -91,18 +92,20 @@ namespace backend.Controllers
                     break;
             }
 
-            var totalProductos = query.Count();
-            var productosDb = query.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+            var totalProductos = query.Count(); // aca contamos cuantos productos hay post aplicación de filtros
+            var productosDb = query.Skip((page - 1) * pageSize).Take(pageSize).ToList(); // aca obtenemos los productos con la paginación
 
+            //aca vamos a convertir los productos en DTOs con la imagen de cada producto si existe
             var productosDto = productosDb
                 .Select(p =>
                 {
-                    var imagen = _context.Imagen.FirstOrDefault(i =>
-                        i.TipoImagen == "ProductoServicio"
-                        && i.IdRelacionado == p.Id
-                        && i.Activo == true
+                    var imagen = _context.Imagen.FirstOrDefault(i => // aca obtenemos la imagen de cada producto
+                        i.TipoImagen == "ProductoServicio" // verificamos que el tipo de imagen sea "ProductoServicio"
+                        && i.IdRelacionado == p.Id // verificamos que el id de la imagen sea igual al id del producto
+                        && i.Activo == true // verificamos que la imagen esté activa
                     );
 
+                    // aca creamos el DTO q contiene el id, nombre, descripción, precio, es almacenable, cantidad y la ruta de la imagen
                     return new ProductoServicioConImagenDto
                     {
                         Id = p.Id,
@@ -114,8 +117,9 @@ namespace backend.Controllers
                         RutaImagen = imagen?.Ruta,
                     };
                 })
-                .ToList();
+                .ToList(); // aca convertimos la lista de productos en una lista de DTOs
 
+            // aca lo q vamos a hacer es devolver un JSON con la lista de productos y la paginación
             return Ok(
                 new
                 {
@@ -123,14 +127,14 @@ namespace backend.Controllers
                     message = totalProductos > 0
                         ? "Lista obtenida correctamente."
                         : "No hay productos.",
-                    pagination = new
+                    pagination = new // creamos un objeto con la paginación que contiene el total de páginas, la página actual, el tamaño de la página y el total de productos
                     {
-                        totalPages = (int)Math.Ceiling((double)totalProductos / pageSize),
-                        currentPage = page,
-                        pageSize,
-                        totalProductos,
+                        totalPages = (int)Math.Ceiling((double)totalProductos / pageSize), // aca obtenemos el total de páginas
+                        currentPage = page, // aca obtenemos la página actual
+                        pageSize, // aca obtenemos el tamaño de la página
+                        totalProductos, // aca obtenemos el total de productos
                     },
-                    productos = productosDto,
+                    productos = productosDto, // aca obtenemos la lista de productos con la paginación y la imagen de cada producto
                 }
             );
         }
