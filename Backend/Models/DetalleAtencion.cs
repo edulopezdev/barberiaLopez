@@ -22,6 +22,8 @@ namespace backend.Models
         [Range(0, 10000)]
         public decimal PrecioUnitario { get; set; }
 
+        public string? Observacion { get; set; }
+
         // propiedades de navegación
         [ForeignKey("ProductoServicioId")]
         public ProductoServicio ProductoServicio { get; set; } = null!;

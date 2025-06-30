@@ -9,5 +9,6 @@ namespace backend.Dtos
 
         [Column(TypeName = "decimal(10,2)")]
         public decimal PrecioUnitario { get; set; }
+        public string? Observacion { get; set; }
     }
 }

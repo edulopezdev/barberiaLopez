@@ -88,6 +88,13 @@
             <td>$ {{ (item.cantidad * item.precioUnitario).toFixed(2) }}</td>
             <td>
               <button
+                @click="abrirNotaModal(index)"
+                class="btn-editar-nota"
+                aria-label="Editar nota"
+              >
+                <i class="pi pi-pencil"></i>
+              </button>
+              <button
                 @click="eliminarDelCarrito(index)"
                 class="btn-eliminar-item"
                 aria-label="Eliminar"
@@ -102,6 +109,33 @@
         <strong>Total: ${{ totalCarrito.toFixed(2) }}</strong>
       </div>
     </div>
+
+    <Dialog
+      v-model:visible="notaModal.visible"
+      header="Observación"
+      :modal="true"
+      :closable="true"
+      :style="{ width: '400px' }"
+    >
+      <div class="campo">
+        <label for="nota">Nota para el producto</label>
+        <Textarea v-model="notaModal.texto" rows="4" autoResize />
+      </div>
+      <template #footer>
+        <Button
+          label="Cancelar"
+          icon="pi pi-times"
+          @click="cerrarNotaModal"
+          class="p-button-text"
+        />
+        <Button
+          label="Guardar"
+          icon="pi pi-check"
+          @click="guardarNota"
+          autofocus
+        />
+      </template>
+    </Dialog>
 
     <!-- Botones Guardar y Cerrar -->
     <div class="acciones-formulario">
@@ -134,10 +168,19 @@ import AutoComplete from "primevue/autocomplete";
 import Button from "primevue/button";
 import UsuarioService from "../services/UsuarioService";
 import VentaService from "../services/VentaService";
+import Dialog from "primevue/dialog";
+import Textarea from "primevue/textarea";
 
 export default {
   name: "VentaForm",
-  components: { InputText, InputNumber, AutoComplete, Button },
+  components: {
+    InputText,
+    InputNumber,
+    AutoComplete,
+    Button,
+    Dialog,
+    Textarea,
+  },
   props: {
     venta: {
       type: [String, Number, Object, null],
@@ -158,6 +201,11 @@ export default {
       busquedaProducto: "",
       errores: {
         cliente: null,
+      },
+      notaModal: {
+        visible: false,
+        index: null,
+        texto: "",
       },
     };
   },
@@ -281,6 +329,11 @@ export default {
       this.carrito.splice(index, 1);
     },
 
+    editarNota(index) {
+      alert(`Editar nota del producto índice ${index}`);
+      // Aquí puedes implementar la lógica para editar la nota
+    },
+
     validarFormulario() {
       this.errores = { cliente: null };
 
@@ -306,7 +359,7 @@ export default {
         total: this.totalCarrito,
         id: this.ventaId,
       };
-
+      console.log("Datos a enviar al backend:", JSON.stringify(datos, null, 2));
       this.$emit("guardar", datos);
     },
 
@@ -316,6 +369,25 @@ export default {
       this.busquedaProducto = "";
       this.productos = [];
       this.errores = { cliente: null };
+    },
+    abrirNotaModal(index) {
+      const item = this.carrito[index];
+      this.notaModal = {
+        visible: true,
+        index,
+        texto: item.observacion || "",
+      };
+    },
+    cerrarNotaModal() {
+      this.notaModal.visible = false;
+      this.notaModal.index = null;
+      this.notaModal.texto = "";
+    },
+    guardarNota() {
+      if (this.notaModal.index !== null) {
+        this.carrito[this.notaModal.index].observacion = this.notaModal.texto;
+      }
+      this.cerrarNotaModal();
     },
   },
 };
@@ -505,5 +577,25 @@ label {
   min-width: 24px;
   text-align: center;
   user-select: none;
+}
+.btn-editar-nota {
+  background-color: transparent;
+  border: none;
+  color: #007bff;
+  font-size: 1.2rem;
+  padding: 0.2rem 0.6rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.btn-editar-nota:hover {
+  background-color: rgba(0, 123, 255, 0.1);
+}
+
+.btn-editar-nota:focus,
+.btn-editar-nota:active {
+  outline: none;
+  box-shadow: none;
+  background-color: transparent !important;
 }
 </style>

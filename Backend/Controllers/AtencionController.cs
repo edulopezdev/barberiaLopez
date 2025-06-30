@@ -108,6 +108,7 @@ namespace backend.Controllers
                             cantidad = d.Cantidad,
                             precioUnitario = d.PrecioUnitario,
                             subtotal = d.Cantidad * d.PrecioUnitario,
+                            observacion = d.Observacion, // Nuevo campo Observacion
                         }),
                         totalVenta = atencion.Total,
                         pagos = new List<object>(),
@@ -279,6 +280,7 @@ namespace backend.Controllers
                         ProductoServicioId = d.ProductoServicioId,
                         Cantidad = d.Cantidad,
                         PrecioUnitario = d.PrecioUnitario,
+                        Observacion = d.Observacion, //Nuevo campo Observacion
                     })
                     .ToList(),
             };
@@ -286,6 +288,17 @@ namespace backend.Controllers
             try
             {
                 _context.Atencion.Add(atencion);
+                foreach (var detalle in atencion.DetalleAtencion)
+                {
+                    _logger.LogInformation(
+                        "Detalle a guardar: ProductoServicioId={ProductoServicioId}, Cantidad={Cantidad}, PrecioUnitario={PrecioUnitario}, Observacion={Observacion}",
+                        detalle.ProductoServicioId,
+                        detalle.Cantidad,
+                        detalle.PrecioUnitario,
+                        detalle.Observacion ?? "null"
+                    );
+                }
+
                 await _context.SaveChangesAsync();
 
                 _logger.LogInformation(

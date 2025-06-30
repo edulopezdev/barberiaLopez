@@ -32,6 +32,7 @@ namespace backend.Dtos
         public int Cantidad { get; set; }
         public decimal PrecioUnitario { get; set; }
         public decimal Subtotal => Cantidad * PrecioUnitario;
+        public string? Observacion { get; set; }
     }
 
     public class PagoInfoDto

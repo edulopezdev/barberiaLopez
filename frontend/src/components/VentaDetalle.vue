@@ -8,7 +8,6 @@
         <label><i class="pi pi-id-card"></i> Cliente</label>
         <p>{{ venta?.ClienteNombre }}</p>
       </div>
-
       <div class="campo">
         <label><i class="pi pi-calendar"></i> Fecha de Atención</label>
         <p>{{ formatearFecha(venta?.FechaAtencion) }}</p>
@@ -41,6 +40,7 @@
             <th>Cantidad</th>
             <th>Precio Unitario</th>
             <th>Subtotal</th>
+            <th>Acciones</th>
           </tr>
         </thead>
         <tbody>
@@ -49,6 +49,18 @@
             <td>{{ detalle.Cantidad }}</td>
             <td>$ {{ detalle.PrecioUnitario.toFixed(2) }}</td>
             <td>$ {{ detalle.Subtotal.toFixed(2) }}</td>
+            <td>
+              <button
+                class="btn-icono"
+                @click="abrirObservacion(detalle.Observacion)"
+                aria-label="Ver observación"
+              >
+                <i
+                  class="pi pi-book"
+                  :style="{ opacity: detalle.observacion?.trim() ? 1 : 0.4 }"
+                ></i>
+              </button>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -75,21 +87,52 @@
       </div>
     </div>
 
-    <!-- Acciones -->
+    <!-- Acciones finales -->
     <div class="acciones-formulario">
       <button class="btn-cerrar" @click="$emit('cerrar')" aria-label="Cerrar">
         <i class="pi pi-times"></i>
       </button>
     </div>
+
+    <!-- Modal de Observación individual -->
+    <Dialog
+      v-model:visible="mostrarModalObservacion"
+      :modal="true"
+      :closable="false"
+      :dismissableMask="true"
+      :style="{ width: '400px' }"
+    >
+      <template #header>
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          "
+        >
+          <span>Observación</span>
+          <button
+            class="btn-cerrar"
+            @click="mostrarModalObservacion = false"
+            aria-label="Cerrar"
+          >
+            <i class="pi pi-times"></i>
+          </button>
+        </div>
+      </template>
+
+      <p>{{ observacionSeleccionada }}</p>
+    </Dialog>
   </div>
 </template>
 
 <script>
 import Tag from "primevue/tag";
+import Dialog from "primevue/dialog";
 
 export default {
   name: "VentaDetalle",
-  components: { Tag },
+  components: { Tag, Dialog },
   props: {
     venta: {
       type: Object,
@@ -97,6 +140,15 @@ export default {
     },
   },
   emits: ["cerrar"],
+  data() {
+    return {
+      mostrarModalObservacion: false,
+      observacionSeleccionada: "",
+    };
+  },
+  mounted() {
+    console.log("Venta completa:", this.venta);
+  },
   methods: {
     formatearFecha(fecha) {
       if (!fecha) return "No disponible";
@@ -108,6 +160,14 @@ export default {
         hour: "2-digit",
         minute: "2-digit",
       });
+    },
+    abrirObservacion(observacion) {
+      if (!observacion || !observacion.trim()) {
+        this.observacionSeleccionada = "No posee observaciones.";
+      } else {
+        this.observacionSeleccionada = observacion;
+      }
+      this.mostrarModalObservacion = true;
     },
   },
   computed: {
@@ -195,5 +255,17 @@ p {
   color: #ccc;
   font-size: 1.2rem;
   cursor: pointer;
+}
+
+.btn-icono {
+  background-color: transparent;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: #ccc;
+}
+
+.btn-icono:hover {
+  color: #fff;
 }
 </style>

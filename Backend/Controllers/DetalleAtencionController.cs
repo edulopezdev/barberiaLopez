@@ -1,8 +1,10 @@
+using System.Text.Json;
 using backend.Data;
 using backend.Dtos;
 using backend.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace backend.Controllers
 {
@@ -11,10 +13,15 @@ namespace backend.Controllers
     public class DetalleAtencionController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly ILogger<DetalleAtencionController> _logger;
 
-        public DetalleAtencionController(ApplicationDbContext context)
+        public DetalleAtencionController(
+            ApplicationDbContext context,
+            ILogger<DetalleAtencionController> logger
+        )
         {
             _context = context;
+            _logger = logger;
         }
 
         // GET: api/detalleatencion (Lista de detalles de atenciones)
@@ -121,6 +128,7 @@ namespace backend.Controllers
                                 d.ProductoServicio?.Nombre ?? "Producto/Servicio borrado",
                             Cantidad = d.Cantidad,
                             PrecioUnitario = d.PrecioUnitario,
+                            Observacion = d.Observacion,
                         })
                         .ToList(),
                     Pagos = pagos
@@ -186,8 +194,15 @@ namespace backend.Controllers
                     NombreProducto = d.ProductoServicio?.Nombre ?? "Producto/Servicio borrado",
                     Cantidad = d.Cantidad,
                     PrecioUnitario = d.PrecioUnitario,
+                    Observacion = d.Observacion,
                 })
                 .ToList();
+
+            _logger.LogInformation(
+                "DetalleAtencion enviados para la venta con Id {AtencionId}: {DetallesJson}",
+                id,
+                JsonSerializer.Serialize(detalles)
+            );
 
             var venta = new VentaDto
             {

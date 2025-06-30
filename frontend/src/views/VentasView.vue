@@ -449,9 +449,10 @@ export default {
               Cantidad: d.cantidad,
               PrecioUnitario: d.precioUnitario,
               Subtotal: d.subtotal,
+              Observacion: d.observacion || '',
             })),
             TotalVenta: data.totalVenta,
-            Pagos: data.pagos || [],
+            Pagos: data.pagos || [],          
             AtencionId: atencionId,
           };
           this.mostrarDetalleModal = true;
@@ -480,6 +481,7 @@ export default {
           productoServicioId: d.productoServicioId,
           cantidad: d.cantidad,
           precioUnitario: d.precioUnitario,
+          observacion: d.observacion || null,
         })),
       };
 
